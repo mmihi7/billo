@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Tabs collection rules
+    match /tabs/{tabId} {
+      // Allow read access to anyone with the tab reference number
+      allow read: if true;
+      
+      // Allow create for new tabs
+      allow create: if request.auth != null || true; // Allow anonymous for demo
+      
+      // Allow update for status changes and total updates
+      allow update: if request.auth != null || true; // Allow anonymous for demo
+      
+      // Prevent deletion of tabs
+      allow delete: if false;
+    }
+    
+    // Orders collection rules
+    match /orders/{orderId} {
+      // Allow read access to orders
+      allow read: if true;
+      
+      // Allow create for new orders
+      allow create: if request.auth != null || true; // Allow anonymous for demo
+      
+      // Prevent updates and deletions of orders
+      allow update, delete: if false;
+    }
+    
+    // Payments collection rules
+    match /payments/{paymentId} {
+      // Allow read access to payments
+      allow read: if true;
+      
+      // Allow create for new payments
+      allow create: if request.auth != null || true; // Allow anonymous for demo
+      
+      // Allow update for payment status changes
+      allow update: if request.auth != null || true; // Allow anonymous for demo
+      
+      // Prevent deletion of payments
+      allow delete: if false;
+    }
+    
+    // Restaurants collection rules
+    match /restaurants/{restaurantId} {
+      // Allow read access to restaurant info
+      allow read: if true; // Publicly readable
+      
+      // Any authenticated user can create a restaurant, but must set themselves as owner
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      
+      // Only the owner of the restaurant can update it
+      allow update: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      
+      // Prevent deletion of restaurants
+      allow delete: if false;
+    }
+    
+    // Menu items collection rules
+    match /menuItems/{itemId} {
+      // Allow read access to menu items
+      allow read: if true;
+      
+      // Only authenticated users can manage menu items
+      allow create, update, delete: if request.auth != null;
+    }
+    
+    // Waiters collection rules (for authentication)
+    match /waiters/{waiterId} {
+      // Allow read access for waiter info
+      allow read: if request.auth != null || true; // Allow anonymous for demo
+      
+      // Only authenticated users can manage waiters
+      allow create, update, delete: if request.auth != null;
+    }
+  }
+}
+
+// Note: For production, you should implement proper authentication
+// and restrict access based on user roles and ownership.
+// The current rules allow anonymous access for demo purposes.

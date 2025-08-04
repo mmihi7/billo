@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bill-O</string>
+    <string name="title_activity_main">Bill-O</string>
+    <string name="package_name">com.billo.app</string>
+    <string name="custom_url_scheme">com.billo.app</string>
+</resources>

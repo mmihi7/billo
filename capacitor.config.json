@@ -1,0 +1,10 @@
+
+{
+  "appId": "com.billo.app",
+  "appName": "Bill-O",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": true
+  }
+}
