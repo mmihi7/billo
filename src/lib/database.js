@@ -33,6 +33,11 @@ export const createTab = async (tabData) => {
   const restaurantRef = doc(db, RESTAURANTS_COLLECTION, tabData.restaurantId);
   const tabsCollectionRef = collection(db, TABS_COLLECTION);
 
+  // Validate waiter assignment before proceeding
+  if (!tabData.waiterName || !tabData.waiterId) {
+    throw new Error('Waiter assignment is required for tab creation.');
+  }
+
   try {
     // Use a transaction to atomically update the counter and create the tab.
     const newTabDocData = await runTransaction(db, async (transaction) => {
@@ -206,17 +211,35 @@ export const getTabOrders = async (tabId) => {
 
 // Payment Management Functions
 export const createPayment = async (paymentData) => {
+  // Prevent payment if tab has no orders
+  const tabId = paymentData.tabId;
+  if (!tabId) {
+    throw new Error('Tab ID is required for payment.');
+  }
+  // Query orders for this tab
+  const ordersQuery = query(collection(db, ORDERS_COLLECTION), where('tabId', '==', tabId));
+  const ordersSnapshot = await getDocs(ordersQuery);
+  if (ordersSnapshot.empty) {
+    throw new Error('Cannot initiate payment: No orders found for this tab.');
+  }
+
+  // Differentiate initiator by payment method
+  let initiator = 'customer';
+  if (paymentData.method === 'cash') {
+    initiator = 'manager';
+  }
+
   try {
     const docRef = await addDoc(collection(db, PAYMENTS_COLLECTION), {
       ...paymentData,
       status: 'pending',
-      createdAt: serverTimestamp()
-    })
-    
-    return { id: docRef.id, ...paymentData }
+      createdAt: serverTimestamp(),
+      initiator
+    });
+    return { id: docRef.id, ...paymentData, initiator };
   } catch (error) {
-    console.error('Error creating payment:', error)
-    throw error
+    console.error('Error creating payment:', error);
+    throw error;
   }
 }
 

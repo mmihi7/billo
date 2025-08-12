@@ -8,6 +8,14 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 const WaiterDashboardNew = ({ waiter }) => {
+  // Order form state
+  const [orderQuantity, setOrderQuantity] = useState(1);
+  const [orderNotes, setOrderNotes] = useState('');
+  // Menu items state
+  const [menuItems, setMenuItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedMenuItem, setSelectedMenuItem] = useState('');
   // Hooks must be called unconditionally at the top level
   const navigate = useNavigate();
   const location = useLocation();
@@ -15,10 +23,12 @@ const WaiterDashboardNew = ({ waiter }) => {
   
   // Core state
   const [isLoading, setIsLoading] = useState(true);
-  // Removed tables state
   const [activeOrders, setActiveOrders] = useState([]);
+  const [activeTabs, setActiveTabs] = useState([]);
   const [error, setError] = useState('');
-  const restaurantId = 'ojKj5ydoUmNzfx5pfcm2'; // Hardcoded for testing
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [selectedTabId, setSelectedTabId] = useState('');
+  const restaurantId = 'me3tspMt9QdBX37A4Xco'; // Updated to match Firestore
   
   // Use the waiter prop or fallback to location state
   const waiterData = React.useMemo(() => {
@@ -26,43 +36,73 @@ const WaiterDashboardNew = ({ waiter }) => {
   }, [waiter, location.state]);
   // Load tables and active orders on component mount
   useEffect(() => {
-    const loadOrders = async () => {
+    // Load menu items and categories for the restaurant
+    const loadMenuItems = async () => {
       try {
-        setIsLoading(true);
-        // Load active orders (in a real app, this would come from your database)
-        const activeOrdersData = [
-          {
-            id: 'order-1',
-            tableNumber: 5,
-            status: 'preparing',
-            items: [
-              { name: 'Margherita Pizza', quantity: 1, price: 12.99 },
-              { name: 'Caesar Salad', quantity: 2, price: 8.99 }
-            ],
-            startTime: new Date(Date.now() - 15 * 60 * 1000) // 15 minutes ago
-          },
-          {
-            id: 'order-2',
-            tableNumber: 8,
-            status: 'ready',
-            items: [
-              { name: 'Pasta Carbonara', quantity: 1, price: 14.99 },
-              { name: 'Garlic Bread', quantity: 2, price: 4.99 },
-              { name: 'Tiramisu', quantity: 1, price: 6.99 }
-            ],
-            startTime: new Date(Date.now() - 30 * 60 * 1000) // 30 minutes ago
-          }
-        ];
-        setActiveOrders(activeOrdersData);
+        const menuQuery = query(
+          collection(db, 'menuItems'),
+          where('restaurantId', '==', restaurantId)
+        );
+        const { onSnapshot } = await import('firebase/firestore');
+        onSnapshot(menuQuery, (menuSnapshot) => {
+          const items = menuSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setMenuItems(items);
+          const uniqueCategories = Array.from(new Set(items.map(item => item.category))).filter(Boolean);
+          setCategories(uniqueCategories);
+        });
       } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Failed to load dashboard data. Please try again.');
-      } finally {
-        setIsLoading(false);
+        console.error('Error loading menu items:', err);
       }
     };
-    loadOrders();
-  }, []);
+    loadMenuItems();
+
+    let tabsUnsub = null;
+    let ordersUnsubs = [];
+    setIsLoading(true);
+    const setupRealtimeTabsAndOrders = async () => {
+      const { onSnapshot, query, collection, where } = await import('firebase/firestore');
+      const tabsQuery = query(
+        collection(db, 'tabs'),
+        where('restaurantId', '==', restaurantId),
+        where('status', '==', 'active')
+      );
+      tabsUnsub = onSnapshot(tabsQuery, (tabsSnapshot) => {
+        const tabs = tabsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setActiveTabs(tabs);
+        // Unsubscribe previous orders listeners
+        ordersUnsubs.forEach(unsub => unsub && unsub());
+        ordersUnsubs = [];
+        // For each tab, listen for its orders
+        let allOrders = [];
+        tabs.forEach(tab => {
+          const ordersQuery = query(
+            collection(db, 'orders'),
+            where('tabId', '==', tab.id)
+          );
+          const unsub = onSnapshot(ordersQuery, (ordersSnapshot) => {
+            const tabOrders = ordersSnapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              tableNumber: tab.tableNumber,
+              tabStatus: tab.status,
+              startTime: tab.createdAt?.toDate ? tab.createdAt.toDate() : new Date()
+            }));
+            // Merge orders for all tabs
+            allOrders = allOrders.filter(o => o.tabId !== tab.id).concat(tabOrders);
+            setActiveOrders([...allOrders]);
+          });
+          ordersUnsubs.push(unsub);
+        });
+      });
+      setIsLoading(false);
+    };
+    setupRealtimeTabsAndOrders();
+    // Cleanup listeners on unmount
+    return () => {
+      if (tabsUnsub) tabsUnsub();
+      ordersUnsubs.forEach(unsub => unsub && unsub());
+    };
+  }, [waiterData, currentUser]);
   
   // Calculate order total
   const calculateOrderTotal = (items) => {
@@ -137,6 +177,31 @@ const WaiterDashboardNew = ({ waiter }) => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        {/* Active Tabs as Micro Cards */}
+        <div className="mb-8">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Active Tabs</h2>
+          <div className="flex flex-wrap gap-3">
+            {activeTabs.length > 0 ? (
+              activeTabs.map(tab => (
+                <Card
+                  key={tab.id}
+                  className="w-32 h-20 flex flex-col items-center justify-center cursor-pointer hover:shadow-lg border border-gray-200"
+                  onClick={() => {
+                    setSelectedTabId(tab.id);
+                    setShowOrderForm(true);
+                  }}
+                >
+                  <CardContent className="flex flex-col items-center justify-center p-2">
+                    <span className="text-xs text-gray-500">Tab</span>
+                    <span className="font-bold text-lg">{tab.referenceNumber}</span>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <span className="text-gray-500">No active tabs</span>
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
           {/* Active Orders Only */}
           <div>
@@ -158,7 +223,7 @@ const WaiterDashboardNew = ({ waiter }) => {
                     </CardHeader>
                     <CardContent className="p-4">
                       <div className="space-y-3">
-                        {order.items.map((item, index) => (
+                        {(order.items || []).map((item, index) => (
                           <div key={index} className="flex justify-between text-sm">
                             <div className="flex items-center">
                               <span className="font-medium">{item.quantity}x</span>
@@ -170,7 +235,7 @@ const WaiterDashboardNew = ({ waiter }) => {
                         <div className="border-t border-gray-200 pt-2 mt-2">
                           <div className="flex justify-between font-medium">
                             <span>Total</span>
-                            <span>${calculateOrderTotal(order.items)}</span>
+                            <span>${calculateOrderTotal(order.items || [])}</span>
                           </div>
                         </div>
                       </div>
@@ -227,17 +292,114 @@ const WaiterDashboardNew = ({ waiter }) => {
             {/* Quick Actions */}
             <div className="mt-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <Button 
-                  variant="outline" 
-                  className="h-auto py-3"
-                  onClick={() => navigate('/new-order')}
+              <div className="grid grid-cols-1 gap-3">
+      {/* New Order Form Modal */}
+      {showOrderForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+            <h2 className="text-lg font-bold mb-4">Create New Order</h2>
+            <form
+              onSubmit={async e => {
+                e.preventDefault();
+                if (!selectedTabId || !selectedMenuItem || !orderQuantity) return;
+                try {
+                  // Find selected menu item details
+                  const menuItem = menuItems.find(item => item.id === selectedMenuItem);
+                  // Create order object
+                  const newOrder = {
+                    tabId: selectedTabId,
+                    items: [
+                      {
+                        menuItemId: selectedMenuItem,
+                        name: menuItem?.name || '',
+                        quantity: Number(orderQuantity),
+                        notes: orderNotes,
+                        price: menuItem?.price || 0,
+                      }
+                    ],
+                    status: 'preparing',
+                    createdAt: new Date(),
+                    waiterId: waiterData.id || currentUser?.uid,
+                  };
+                  const { addDoc } = await import('firebase/firestore');
+                  await addDoc(collection(db, 'orders'), newOrder);
+                  setShowOrderForm(false);
+                  setOrderQuantity(1);
+                  setOrderNotes('');
+                  setSelectedMenuItem('');
+                  setSelectedCategory('');
+                  // Reload orders
+                  if (typeof loadOrdersAndTabs === 'function') {
+                    await loadOrdersAndTabs();
+                  } else {
+                    window.location.reload();
+                  }
+                } catch (err) {
+                  console.error('Error creating order:', err);
+                  alert('Failed to create order. Please try again.');
+                }
+              }}
+            >
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  value={selectedCategory}
+                  onChange={e => {
+                    setSelectedCategory(e.target.value);
+                    setSelectedMenuItem('');
+                  }}
+                  required
                 >
-                  <div className="text-left">
-                    <div className="font-medium">New Order</div>
-                    <div className="text-xs text-gray-500">Start a new table order</div>
-                  </div>
-                </Button>
+                  <option value="">-- Select Category --</option>
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Menu Item</label>
+                <select
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  value={selectedMenuItem}
+                  onChange={e => setSelectedMenuItem(e.target.value)}
+                  required
+                  disabled={!selectedCategory}
+                >
+                  <option value="">-- Select Menu Item --</option>
+                  {menuItems.filter(item => item.category === selectedCategory).map(item => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                <input
+                  type="number"
+                  min="1"
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  required
+                  value={orderQuantity}
+                  onChange={e => setOrderQuantity(e.target.value)}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  rows="2"
+                  value={orderNotes}
+                  onChange={e => setOrderNotes(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" type="button" onClick={() => setShowOrderForm(false)}>Cancel</Button>
+                <Button type="submit" disabled={!selectedTabId || !selectedMenuItem}>Create Order</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
                 <Button 
                   variant="outline" 
                   className="h-auto py-3"

@@ -35,11 +35,24 @@ function CustomerApp() {
         }
         setRestaurant(restaurantData);
 
+        let existingTab = null;
         if (tabIdFromStorage) {
-          // In a full implementation, you'd fetch the existing tab here.
-          // For now, we'll just proceed to create a new one.
+          // Fetch the tab from Firestore
+          const { getDoc, doc } = await import('firebase/firestore');
+          const tabDoc = await getDoc(doc(db, 'tabs', tabIdFromStorage));
+          if (tabDoc.exists()) {
+            existingTab = { id: tabDoc.id, ...tabDoc.data() };
+          }
         }
-        
+
+        // If tab exists and is active or pending, use it
+        if (existingTab && (existingTab.status === 'active' || existingTab.status === 'pending')) {
+          setTab(existingTab);
+          setView('tab');
+          return;
+        }
+
+        // Otherwise, create a new tab
         const newTab = await createTab({
           restaurantId: restaurantData.id,
           restaurantName: restaurantData.name,

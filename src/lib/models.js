@@ -18,6 +18,8 @@ export const TabModel = {
     tableNumber: data.tableNumber || '',
     customerName: data.customerName || '',
     customerPhone: data.customerPhone || '',
+    waiterName: data.waiterName || '',
+    waiterId: data.waiterId || '',
     status: TabModel.STATUS.ACTIVE,
     total: 0,
     tax: 0,
@@ -30,16 +32,24 @@ export const TabModel = {
 
   // Validate tab data
   validate: (tab) => {
-    const errors = []
-    
-    if (!tab.restaurantId) errors.push('Restaurant ID is required')
-    if (!tab.tableNumber) errors.push('Table number is required')
-    if (!tab.restaurantName) errors.push('Restaurant name is required')
-    
+    const errors = [];
+    if (!tab.restaurantId) errors.push('Restaurant ID is required');
+    if (!tab.tableNumber) errors.push('Table number is required');
+    if (!tab.restaurantName) errors.push('Restaurant name is required');
+    if (!tab.waiterName) errors.push('Waiter name is required');
+    if (!tab.waiterId) errors.push('Waiter ID is required');
+    // Tabs must be created by waiters
+    if (!tab.createdBy || tab.createdBy !== 'waiter') errors.push('Tab must be created by a waiter');
+    // Tabs must have a referenceNumber (tab id)
+    if (!tab.referenceNumber) errors.push('Tab ID (referenceNumber) is required');
+    // Tabs can be in pending_acceptance status if awaiting customer acceptance
+    if (tab.status === TabModel.STATUS.PENDING_ACCEPTANCE && !tab.customerAccepted) {
+      errors.push('Tab is pending acceptance by customer');
+    }
     return {
       isValid: errors.length === 0,
       errors
-    }
+    };
   }
 }
 
@@ -60,18 +70,20 @@ export const OrderModel = {
 
   // Validate order data
   validate: (order) => {
-    const errors = []
-    
-    if (!order.tabId) errors.push('Tab ID is required')
-    if (!order.itemName) errors.push('Item name is required')
-    if (order.price <= 0) errors.push('Price must be greater than 0')
-    if (order.quantity <= 0) errors.push('Quantity must be greater than 0')
-    if (!order.waiterName) errors.push('Waiter name is required')
-    
+    const errors = [];
+    if (!order.tabId) errors.push('Tab ID is required');
+    if (!order.itemName) errors.push('Item name is required');
+    if (order.price <= 0) errors.push('Price must be greater than 0');
+    if (order.quantity <= 0) errors.push('Quantity must be greater than 0');
+    if (!order.waiterName) errors.push('Waiter name is required');
+    // Orders must be initiated by waiter
+    if (!order.createdBy || order.createdBy !== 'waiter') errors.push('Order must be initiated by a waiter');
+    // Orders must be accepted by customer to be valid
+    if (!order.customerAccepted) errors.push('Order must be accepted by customer');
     return {
       isValid: errors.length === 0,
       errors
-    }
+    };
   },
 
   // Calculate order total
