@@ -155,16 +155,6 @@ function WaiterDashboardNew() {
       </div>
     </div>
   );
-}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </main>
-      </div>
-    );
-  }
 
   // Helper functions
   const calculateTotal = (items = []) => {
@@ -234,7 +224,7 @@ function WaiterDashboardNew() {
           </Button>
           <div className="text-right">
             <h2 className="text-xl font-semibold">
-              {tab.customerName || `Table ${tab.tableNumber || 'N/A'}`}
+              {tab.customerName || 'Customer'}
             </h2>
             <p className="text-sm text-muted-foreground">Tab #{tab.referenceNumber}</p>
           </div>
@@ -393,28 +383,17 @@ function WaiterDashboardNew() {
   // Handle submitting the order
   const handleSubmitOrder = async () => {
     if (newOrder.items.length === 0 || !selectedTab) return;
-    
     setIsLoading(true);
     try {
       // Add each item as a separate order
       for (const item of newOrder.items) {
-        await addOrderToTab(selectedTab.id, {
-              <CardDescription>Please contact your manager to set up your waiter account.</CardDescription>
-            </CardHeader>
-            <CardFooter className="justify-center">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => navigate('/')}
-                className="text-muted-foreground"
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
-    );
+        await addOrderToTab(selectedTab.id, item);
+      }
+    } catch (error) {
+      setError('Failed to submit order.');
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   // Default return (shouldn't be reached)

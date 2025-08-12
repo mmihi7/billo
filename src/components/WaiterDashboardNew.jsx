@@ -15,7 +15,7 @@ const WaiterDashboardNew = ({ waiter }) => {
   
   // Core state
   const [isLoading, setIsLoading] = useState(true);
-  const [tables, setTables] = useState([]);
+  // Removed tables state
   const [activeOrders, setActiveOrders] = useState([]);
   const [error, setError] = useState('');
   const restaurantId = 'ojKj5ydoUmNzfx5pfcm2'; // Hardcoded for testing
@@ -26,18 +26,9 @@ const WaiterDashboardNew = ({ waiter }) => {
   }, [waiter, location.state]);
   // Load tables and active orders on component mount
   useEffect(() => {
-    const loadTablesAndOrders = async () => {
+    const loadOrders = async () => {
       try {
         setIsLoading(true);
-        
-        // Load tables (in a real app, this would come from your database)
-        const tablesData = Array.from({ length: 12 }, (_, i) => ({
-          id: `table-${i + 1}`,
-          number: i + 1,
-          status: 'available', // available, occupied
-          orderId: null
-        }));
-        
         // Load active orders (in a real app, this would come from your database)
         const activeOrdersData = [
           {
@@ -62,10 +53,7 @@ const WaiterDashboardNew = ({ waiter }) => {
             startTime: new Date(Date.now() - 30 * 60 * 1000) // 30 minutes ago
           }
         ];
-        
-        setTables(tablesData);
         setActiveOrders(activeOrdersData);
-        
       } catch (err) {
         console.error('Error loading data:', err);
         setError('Failed to load dashboard data. Please try again.');
@@ -73,8 +61,7 @@ const WaiterDashboardNew = ({ waiter }) => {
         setIsLoading(false);
       }
     };
-    
-    loadTablesAndOrders();
+    loadOrders();
   }, []);
   
   // Calculate order total
@@ -89,9 +76,7 @@ const WaiterDashboardNew = ({ waiter }) => {
   };
   
   // Handle table click
-  const handleTableClick = (table) => {
-    navigate(`/tables/${table.number}`, { state: { table } });
-  };
+  // Removed table click handler
   
   // Handle order action
   const handleOrderAction = (order, action) => {
@@ -152,39 +137,8 @@ const WaiterDashboardNew = ({ waiter }) => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Tables Section */}
-          <div className="md:col-span-2">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Tables</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {tables.map((table) => (
-                <Card 
-                  key={table.id}
-                  className={`p-4 text-center cursor-pointer transition-colors ${
-                    table.status === 'occupied' 
-                      ? 'bg-red-50 hover:bg-red-100' 
-                      : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => handleTableClick(table)}
-                >
-                  <Table className="w-8 h-8 mx-auto mb-2 text-gray-600" />
-                  <div className="text-2xl font-bold">{table.number}</div>
-                  <div className="text-sm text-gray-500">
-                    {table.status === 'occupied' ? 'Occupied' : 'Available'}
-                  </div>
-                  {table.status === 'occupied' && (
-                    <div className="mt-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        In Use
-                      </span>
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {/* Active Orders */}
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+          {/* Active Orders Only */}
           <div>
             <h2 className="text-lg font-medium text-gray-900 mb-4">Active Orders</h2>
             <div className="space-y-4">
