@@ -132,14 +132,15 @@ function WaiterHome() {
         // Ensure we have the latest waiter data
         const updatedWaiter = await getWaiterById(waiterFromDB.id);
         
-        // Navigate to waiter dashboard with both waiter and user info
+        // Navigate to waiter dashboard, replacing the current entry in history
+        // This ensures WaiterHome is removed from navigation stack
         navigate(`/waiter/${updatedWaiter.id}`, { 
           state: { 
             waiter: updatedWaiter,
             user: currentUser,
             timestamp: new Date().toISOString()
           },
-          replace: true
+          replace: true // This replaces the current entry in history
         });
         return;
       }
@@ -151,13 +152,14 @@ function WaiterHome() {
       
       if (waiter && waiter.id === selectedWaiter.id) {
         console.log('✅ Database PIN verification successful');
+        // Navigate to waiter dashboard, replacing the current entry in history
         navigate(`/waiter/${waiter.id}`, { 
           state: { 
             waiter,
             user: currentUser,
             timestamp: new Date().toISOString()
           },
-          replace: true
+          replace: true // This replaces the current entry in history
         });
       } else {
         console.error('❌ All PIN verification methods failed');
@@ -260,6 +262,22 @@ function WaiterHome() {
                 <RefreshCw className="h-4 w-4" />
               )}
               Refresh
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                if (currentUser) {
+                  // If user is authenticated, navigate to restaurant dashboard
+                  navigate('/restaurant');
+                } else {
+                  // If not authenticated, navigate to home and show login
+                  navigate('/', { state: { showLogin: true } });
+                }
+              }}
+              className="gap-2 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200"
+            >
+              {currentUser ? 'Restaurant Dashboard' : 'Back to Login'}
             </Button>
           </div>
         </div>

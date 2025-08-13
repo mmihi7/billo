@@ -4,8 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AlertCircle } from 'lucide-react'
 import CustomerApp from './components/CustomerApp'
-import WaiterDashboard from './components/WaiterDashboard'
-import WaiterDashboardNew from './components/WaiterDashboardNew'
+import WaiterDashboardNew from './components/WaiterDashboard';
 import RestaurantDashboard from './components/RestaurantDashboard'
 import HomePage from './components/HomePage'
 import LandingPage from './components/LandingPage'
@@ -24,8 +23,8 @@ const WaiterRoute = ({ children }) => {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [waiterData, setWaiterData] = useState(null)
   
-  // Use the children prop or default to WaiterDashboardNew
-  const content = children || <WaiterDashboardNew />
+  // Use the children prop or default to WaiterDashboard
+  const content = children || <WaiterDashboard />
 
   useEffect(() => {
     console.log('WaiterRoute - Auth state changed:', { user, loading })
@@ -63,6 +62,18 @@ const WaiterRoute = ({ children }) => {
   }
 
   if (showError) {
+    // If we have a waiter in location state but still showing error, try to proceed
+    if (location.state?.waiter) {
+      console.log('Found waiter in location state, proceeding to dashboard...');
+      const childrenWithProps = React.Children.map(children, child => {
+        if (React.isValidElement(child)) {
+          return React.cloneElement(child, { waiter: location.state.waiter });
+        }
+        return child;
+      });
+      return <>{childrenWithProps}</>;
+    }
+    
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="max-w-md p-6 bg-white rounded-lg shadow-md text-center">
@@ -71,31 +82,38 @@ const WaiterRoute = ({ children }) => {
           </div>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
           <p className="text-gray-600 mb-6">{showError}</p>
-          <Button 
-            onClick={() => window.location.href = '/landing'}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Go to Login
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => window.location.reload()}
-            className="w-full"
-          >
-            Try Again
-          </Button>
+          <div className="space-y-2">
+            <Button 
+              onClick={() => window.location.href = '/landing'}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Go to Login
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="w-full"
+            >
+              Try Again
+            </Button>
+          </div>
         </div>
       </div>
     )
   }
 
-  // If we have waiter data, render the content with waiter data
-  if (waiterData || user) {
+  // If we have waiter data, render the protected content
+  if (waiterData || location.state?.waiter) {
+    const dataToPass = waiterData || location.state.waiter;
+    console.log('Rendering WaiterDashboard with data:', dataToPass);
+    
     // Clone the children and pass the waiter data as a prop
     const childrenWithProps = React.Children.map(children, child => {
       if (React.isValidElement(child)) {
         return React.cloneElement(child, { 
-          waiter: waiterData || { id: user?.uid, email: user?.email } 
+          waiter: dataToPass,
+          // Pass additional context if needed
+          key: dataToPass.id || 'waiter-dashboard'
         });
       }
       return child;
