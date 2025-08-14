@@ -1,28 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Clock, Utensils, AlertCircle } from 'lucide-react';
-import { collection, query, where, getDocs, onSnapshot, addDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  onSnapshot, 
+  addDoc, 
+  writeBatch, 
+  doc, 
+  increment 
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 const WaiterDashboard = ({ waiter }) => {
   console.log('WaiterDashboard mounted with waiter:', waiter);
   
+  // All hooks must be declared at the top level, before any conditional returns
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentUser } = useAuth();
+  
   // Order form state - modified to include category in each item
   const [orderItems, setOrderItems] = useState([
     { menuItemId: '', quantity: 1, notes: '', category: '' }
   ]);
   const [orderNotes, setOrderNotes] = useState('');
+  
   // Menu items state
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedMenuItem, setSelectedMenuItem] = useState('');
-  // Hooks
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { currentUser } = useAuth();
   
   // Core state
   const [isLoading, setIsLoading] = useState(true);
@@ -37,6 +49,43 @@ const WaiterDashboard = ({ waiter }) => {
   const waiterData = React.useMemo(() => {
     return waiter || location.state?.waiter || {};
   }, [waiter, location.state]);
+  
+  // State for managing subscriptions
+  const [tabsUnsub, setTabsUnsub] = useState(null);
+  const ordersUnsubsRef = useRef([]);
+  
+  // Debug function - moved to top level
+  const debugCheckTabs = useCallback(async () => {
+    try {
+      console.log('=== DEBUG: Checking Firestore tabs ===');
+      const tabsSnapshot = await getDocs(collection(db, 'tabs'));
+      tabsSnapshot.forEach(doc => {
+        console.log(`Tab ${doc.id}:`, doc.data());
+      });
+      
+      // Also check if we have any active tabs in state
+      console.log('Active tabs in state:', activeTabs);
+    } catch (error) {
+      console.error('Debug check failed:', error);
+    }
+  }, [activeTabs]);
+
+  // Calculate order total
+  const calculateOrderTotal = useCallback((items) => {
+    if (!items || !Array.isArray(items)) return 0;
+    const total = items.reduce((sum, item) => {
+      const price = parseFloat(item.price) || 0;
+      const quantity = parseInt(item.quantity) || 0;
+      return sum + (price * quantity);
+    }, 0);
+    return total;
+  }, []);
+  
+  // Format time duration
+  const formatDuration = useCallback((startTime) => {
+    const diff = Math.floor((new Date() - new Date(startTime)) / 1000 / 60);
+    return `${diff} min`;
+  }, []);
   
   // Load active tabs and orders on component mount
   useEffect(() => {
@@ -61,9 +110,6 @@ const WaiterDashboard = ({ waiter }) => {
     };
     
     const menuUnsub = loadMenuItems();
-
-    let tabsUnsub = null;
-    let ordersUnsubs = [];
     setIsLoading(true);
     
     const setupRealtimeTabsAndOrders = () => {
@@ -71,93 +117,173 @@ const WaiterDashboard = ({ waiter }) => {
       const tabsQuery = query(
         collection(db, 'tabs'),
         where('restaurantId', '==', restaurantId),
-        where('status', '==', 'active')
+        where('status', 'in', ['active', 'inactive'])
       );
       
-      tabsUnsub = onSnapshot(tabsQuery, (tabsSnapshot) => {
-        const tabs = tabsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          referenceNumber: doc.data().referenceNumber || doc.data().tableNumber
-        }));
-        console.log('Active Tabs (realtime):', tabs);
-        setActiveTabs(tabs);
-        
-        // Unsubscribe previous orders listeners
-        ordersUnsubs.forEach(unsub => {
-          if (typeof unsub === 'function') unsub();
-        });
-        ordersUnsubs = [];
-        
-        // For each tab, listen for its orders
-        let allOrders = [];
-        tabs.forEach(tab => {
-          const ordersQuery = query(
-            collection(db, 'orders'),
-            where('tabId', '==', tab.id)
-          );
-          const unsub = onSnapshot(ordersQuery, (ordersSnapshot) => {
-            const tabOrders = ordersSnapshot.docs.map(doc => {
-              const tabRef = tab.referenceNumber || tab.tableNumber;
-              console.log('Processing order for tab:', { 
-                tabId: tab.id, 
-                tabReferenceNumber: tabRef,
-                tabData: tab 
-              });
-              
-              const orderData = {
+      // Set up tabs listener
+      const tabsUnsub = onSnapshot(
+        tabsQuery, 
+        (tabsSnapshot) => {
+          try {
+            console.log('Tabs snapshot received:', {
+              size: tabsSnapshot.size,
+              empty: tabsSnapshot.empty,
+              docs: tabsSnapshot.docs.map(doc => ({
                 id: doc.id,
-                ...doc.data(),
-                tabNumber: tabRef,
-                tabStatus: tab.status,
-                startTime: tab.createdAt?.toDate ? tab.createdAt.toDate() : new Date()
-              };
-              console.log('Order data with tab number:', orderData);
-              return orderData;
+                exists: doc.exists(),
+                data: doc.data()
+              }))
             });
             
-            allOrders = allOrders.filter(o => o.tabId !== tab.id).concat(tabOrders);
-            setActiveOrders([...allOrders]);
+            const tabs = [];
+            tabsSnapshot.forEach(doc => {
+              try {
+                const data = doc.data();
+                console.log(`Processing tab ${doc.id}:`, data);
+                
+                if (!data) {
+                  console.warn(`Tab ${doc.id} has no data`);
+                  return;
+                }
+                
+                tabs.push({
+                  id: doc.id,
+                  ...data,
+                  referenceNumber: data.referenceNumber || data.tableNumber || `TAB-${doc.id.substring(0, 4).toUpperCase()}`,
+                  total: typeof data.total === 'number' ? data.total : 0,
+                  waiterName: data.waiterName || 'Unassigned',
+                  _updatedAt: new Date().toISOString()
+                });
+              } catch (error) {
+                console.error(`Error processing tab ${doc.id}:`, error);
+              }
+            });
+            
+            console.log('Processed Active Tabs:', tabs);
+            setActiveTabs(tabs);
+            
+            // Set up orders listeners for each tab
+            setupOrdersListeners(tabs);
+          } catch (error) {
+            console.error('Error in tabs snapshot handler:', error);
+            setError(`Error processing tabs: ${error.message}`);
+          }
+        },
+        (error) => {
+          console.error('Error in tabs listener:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
           });
-          ordersUnsubs.push(unsub);
-        });
-      }, (error) => {
-        console.error('Error in tabs listener:', error);
-        setError('Failed to load tabs: ' + error.message);
-        setIsLoading(false);
-      });
+          setError(`Error loading tabs: ${error.message}`);
+        }
+      );
+      
+      // Store the tabs unsubscribe function
+      setTabsUnsub(() => tabsUnsub);
+      
+      // Initial setup complete
       setIsLoading(false);
+    };
+    
+    // Set up orders listeners for tabs
+    const setupOrdersListeners = (tabs) => {
+      // Clear previous orders
+      setActiveOrders([]);
+      
+      // Clear previous orders listeners
+      ordersUnsubsRef.current.forEach(unsub => {
+        if (typeof unsub === 'function') unsub();
+      });
+      
+      // Reset orders unsubs array
+      ordersUnsubsRef.current = [];
+      
+      // For each tab, listen for its orders
+      const allOrders = [];
+      
+      tabs.forEach(tab => {
+        const ordersQuery = query(
+          collection(db, 'orders'),
+          where('tabId', '==', tab.id)
+        );
+        
+        const unsub = onSnapshot(
+          ordersQuery, 
+          (ordersSnapshot) => {
+            try {
+              const tabOrders = ordersSnapshot.docs.map(doc => {
+                const tabRef = tab.referenceNumber || tab.tableNumber;
+                console.log('Processing order for tab:', { 
+                  tabId: tab.id, 
+                  tabReferenceNumber: tabRef,
+                  tabData: tab 
+                });
+                
+                const orderData = {
+                  id: doc.id,
+                  ...doc.data(),
+                  tabNumber: tabRef,
+                  tabStatus: tab.status,
+                  startTime: tab.createdAt?.toDate ? tab.createdAt.toDate() : new Date()
+                };
+                console.log('Order data with tab number:', orderData);
+                return orderData;
+              });
+              
+              // Update all orders for this tab
+              const updatedOrders = allOrders
+                .filter(o => o.tabId !== tab.id)
+                .concat(tabOrders);
+              
+              // Update state with the new orders
+              setActiveOrders([...updatedOrders]);
+              
+              // Update local allOrders array for the next iteration
+              allOrders.length = 0;
+              allOrders.push(...updatedOrders);
+            } catch (error) {
+              console.error('Error processing orders:', error);
+              setError(`Error processing orders: ${error.message}`);
+            }
+          },
+          (error) => {
+            console.error('Error in orders listener:', {
+              code: error.code,
+              message: error.message,
+              stack: error.stack
+            });
+            setError(`Error loading orders: ${error.message}`);
+          }
+        );
+        
+        // Store the unsubscribe function
+        ordersUnsubsRef.current.push(unsub);
+      });
     };
     
     setupRealtimeTabsAndOrders();
     
     // Cleanup listeners on unmount
     return () => {
-      if (menuUnsub && typeof menuUnsub === 'function') menuUnsub();
-      if (tabsUnsub && typeof tabsUnsub === 'function') tabsUnsub();
-      ordersUnsubs.forEach(unsub => {
+      if (tabsUnsub) tabsUnsub();
+      // Clean up any order listeners
+      ordersUnsubsRef.current.forEach(unsub => {
         if (typeof unsub === 'function') unsub();
       });
+      ordersUnsubsRef.current = [];
+      if (menuUnsub) menuUnsub();
     };
   }, [waiterData, currentUser]);
   
-  // Calculate order total
-  const calculateOrderTotal = (items) => {
-    if (!items || !Array.isArray(items)) return 0;
-    const total = items.reduce((sum, item) => {
-      const price = parseFloat(item.price) || 0;
-      const quantity = parseInt(item.quantity) || 0;
-      return sum + (price * quantity);
-    }, 0);
-    return total;
-  };
-  
-  // Format time duration
-  const formatDuration = (startTime) => {
-    const diff = Math.floor((new Date() - new Date(startTime)) / 1000 / 60);
-    return `${diff} min`;
-  };
-  
+  // Call debug function on mount
+  useEffect(() => {
+    const runDebug = async () => {
+      await debugCheckTabs();
+    };
+    runDebug();
+  }, [debugCheckTabs]);
+
   // Render loading state
   if (isLoading) {
     return (
@@ -200,6 +326,39 @@ const WaiterDashboard = ({ waiter }) => {
               <p className="text-sm text-gray-500">Waiter Dashboard</p>
             )}
           </div>
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={debugCheckTabs}
+            >
+              Debug Tabs
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={async () => {
+                try {
+                  console.log('Creating test tab...');
+                  const tabRef = await addDoc(collection(db, 'tabs'), {
+                    restaurantId: restaurantId,
+                    status: 'active',
+                    referenceNumber: `TAB-${Math.floor(1000 + Math.random() * 9000)}`,
+                    total: 0,
+                    createdAt: new Date(),
+                    waiterId: waiterData.id || currentUser?.uid,
+                    waiterName: waiterData.name || 'Test Waiter'
+                  });
+                  console.log('Test tab created:', tabRef.id);
+                  debugCheckTabs();
+                } catch (error) {
+                  console.error('Error creating test tab:', error);
+                }
+              }}
+            >
+              Create Test Tab
+            </Button>
+          </div>
           <Button 
             variant="outline" 
             onClick={() => navigate('/waiterhome')}
@@ -225,9 +384,18 @@ const WaiterDashboard = ({ waiter }) => {
                     setShowOrderForm(true);
                   }}
                 >
-                  <CardContent className="flex flex-col items-center justify-center p-2">
-                    <span className="text-xs text-gray-500">Tab</span>
-                    <span className="font-bold text-lg">{tab.referenceNumber}</span>
+                  <CardContent className="flex flex-col items-center justify-center p-2 w-full">
+                    <div className="flex justify-between w-full items-center mb-1">
+                      <span className="text-xs text-gray-500">Tab {tab.referenceNumber}</span>
+                      {tab.waiterName && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                          {tab.waiterName.split(' ')[0]}
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-bold text-lg">
+                      ${tab.total ? tab.total.toFixed(2) : '0.00'}
+                    </div>
                   </CardContent>
                 </Card>
               ))
@@ -253,23 +421,16 @@ const WaiterDashboard = ({ waiter }) => {
                 }, {})
               ).map(([tabNumber, tabOrders]) => (
                 <Card key={`tab-${tabNumber}`} className="overflow-hidden flex flex-col h-full">
-                  <CardHeader className="bg-gray-50 px-4 py-3">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <CardTitle className="text-lg">
-                          Tab {tabNumber}
-                        </CardTitle>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Clock className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm text-gray-500">
-                          {formatDuration(tabOrders[0].startTime)}
-                        </span>
-                      </div>
-                    </div>
-                  </CardHeader>
                   <CardContent className="p-4 flex-1 flex flex-col">
-                    <div className="space-y-3 flex-1">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium">Tab {tabNumber}</h3>
+                      {/* Replaced Badge component with a simple span */}
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                        {tabOrders.length} {tabOrders.length === 1 ? 'order' : 'orders'}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2 mb-3">
                       {tabOrders.flatMap(order => 
                         (order.items || []).map((item, index) => (
                           <div key={`${order.id}-${index}`} className="flex justify-between text-sm">
@@ -284,16 +445,13 @@ const WaiterDashboard = ({ waiter }) => {
                           </div>
                         ))
                       )}
-                      <div className="border-t border-gray-200 pt-2 mt-2">
-                        <div className="flex justify-between font-medium">
-                          <span>Tab Total</span>
-                          <span>${calculateOrderTotal(tabOrders.flatMap(order => order.items || [])).toFixed(2)}</span>
-                        </div>
-                      </div>
                     </div>
                     
-                    <div className="mt-2 text-xs text-gray-500">
-                      {tabOrders.length} {tabOrders.length === 1 ? 'order' : 'orders'} for this tab
+                    <div className="mt-auto pt-2 border-t border-gray-100">
+                      <div className="flex justify-between font-medium">
+                        <span>Tab Total</span>
+                        <span>${calculateOrderTotal(tabOrders.flatMap(order => order.items || [])).toFixed(2)}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -353,6 +511,12 @@ const WaiterDashboard = ({ waiter }) => {
                     if (!selectedTabId || orderItems.length === 0) return;
                     
                     try {
+                      // Get the selected tab
+                      const selectedTab = activeTabs.find(tab => tab.id === selectedTabId);
+                      if (!selectedTab) {
+                        throw new Error('Selected tab not found');
+                      }
+
                       // Prepare order items with menu item details
                       const itemsWithDetails = orderItems.map(item => {
                         const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
@@ -364,23 +528,88 @@ const WaiterDashboard = ({ waiter }) => {
                           price: menuItem?.price || 0,
                         };
                       });
+
+                      // Calculate order total
+                      const orderTotal = itemsWithDetails.reduce(
+                        (sum, item) => sum + (item.price * item.quantity), 
+                        0
+                      );
                       
+                      // Create order data
                       const newOrder = {
                         tabId: selectedTabId,
+                        tabReferenceNumber: selectedTab.referenceNumber,
                         items: itemsWithDetails,
                         status: 'preparing',
                         createdAt: new Date(),
                         waiterId: waiterData.id || currentUser?.uid,
+                        waiterName: waiterData.name || 'Unknown Waiter',
+                        restaurantId: restaurantId,
+                        total: orderTotal,
                         notes: orderNotes,
                       };
                       
-                      await addDoc(collection(db, 'orders'), newOrder);
+                      try {
+                        console.log('Starting batch write with order data:', newOrder);
+                        
+                        // Start a batch write to update both the order and tab
+                        const batch = writeBatch(db);
+                        
+                        // Add the order
+                        const orderRef = doc(collection(db, 'orders'));
+                        console.log('Adding order to batch:', orderRef.id, newOrder);
+                        batch.set(orderRef, newOrder);
+                        
+                        // Update the tab's total
+                        const tabRef = doc(db, 'tabs', selectedTabId);
+                        const tabUpdate = {
+                          total: increment(orderTotal),
+                          updatedAt: new Date(),
+                          status: 'active',
+                          waiterId: waiterData.id || currentUser?.uid,
+                          waiterName: waiterData.name || 'Unknown Waiter'
+                        };
+                        
+                        console.log('Updating tab in batch:', selectedTabId, tabUpdate);
+                        batch.update(tabRef, tabUpdate);
+                        
+                        // Commit the batch
+                        console.log('Committing batch...');
+                        await batch.commit();
+                        console.log('Batch committed successfully');
+                        
+                        // Force refresh of tabs data
+                        const tabsSnapshot = await getDocs(query(
+                          collection(db, 'tabs'),
+                          where('restaurantId', '==', restaurantId),
+                          where('status', '==', 'active')
+                        ));
+                        
+                        const updatedTabs = tabsSnapshot.docs.map(doc => ({
+                          id: doc.id,
+                          ...doc.data(),
+                          referenceNumber: doc.data().referenceNumber || doc.data().tableNumber || `TAB-${doc.id.substring(0, 4).toUpperCase()}`
+                        }));
+                        
+                        console.log('Refreshed tabs after update:', updatedTabs);
+                        setActiveTabs(updatedTabs);
+                        
+                      } catch (batchError) {
+                        console.error('Error in batch operation:', batchError);
+                        console.error('Batch error details:', {
+                          code: batchError.code,
+                          message: batchError.message,
+                          stack: batchError.stack
+                        });
+                        throw batchError;
+                      }
                       
                       // Reset form
                       setShowOrderForm(false);
                       setOrderItems([{ menuItemId: '', quantity: 1, notes: '', category: '' }]);
                       setOrderNotes('');
                       setSelectedMenuItem('');
+                      setSelectedTabId('');
                     } catch (err) {
                       console.error('Error creating order:', err);
                       alert('Failed to create order. Please try again.');

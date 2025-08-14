@@ -49,6 +49,62 @@ function RestaurantDashboard({ isAdminView = false }) {
   const passwordRef = useRef()
   const adminCodeRef = useRef()
   
+  // Load active tabs when restaurant data is available
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    
+    console.log('Loading active tabs for restaurant:', restaurant.id);
+    const unsubscribe = subscribeToActiveTabs(restaurant.id, (tabs) => {
+      console.log('Active tabs updated:', tabs);
+      setTabs(tabs.map(tab => ({
+        ...tab,
+        referenceNumber: tab.referenceNumber || tab.tableNumber || `#${tab.id.slice(-4)}`,
+        waiterName: tab.waiterName || tab.waiter?.name || 'Unassigned'
+      })));
+    }, (error) => {
+      console.error('Error loading tabs:', error);
+      setError('Failed to load active tabs');
+    });
+    
+    return () => unsubscribe();
+  }, [restaurant?.id]);
+  
+  // Function to create a test tab
+  const createTestTab = async () => {
+    if (!restaurant?.id) return;
+    
+    try {
+      setLoading(true);
+      const tabData = {
+        restaurantId: restaurant.id,
+        referenceNumber: Math.floor(1000 + Math.random() * 9000), // Random 4-digit number
+        status: 'active',
+        total: 2500, // Example amount
+        createdAt: new Date(),
+        items: [
+          {
+            name: 'Test Item',
+            price: 2500,
+            quantity: 1,
+            notes: 'Test order'
+          }
+        ],
+        waiterName: 'Test Waiter',
+        customerName: 'Walk-in Customer'
+      };
+      
+      // Import the createTab function
+      const { createTab } = await import('../lib/database');
+      await createTab(tabData);
+      setSuccess('Test tab created successfully!');
+    } catch (error) {
+      console.error('Error creating test tab:', error);
+      setError('Failed to create test tab: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   // Debug log to check the user object
   useEffect(() => {
     console.log('RestaurantDashboard - Current user:', user);
@@ -780,32 +836,59 @@ function RestaurantDashboard({ isAdminView = false }) {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tab ID</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tab #</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Waiter</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Sales</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Outstanding</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {tabs.map(tab => (
-                            <tr key={tab.id} className={tab.expired ? 'bg-red-50' : ''}>
-                              <td className="px-4 py-2 font-semibold">{tab.tabNumber || tab.id}</td>
-                              <td className="px-4 py-2">{tab.waiterName || 'Unassigned'}</td>
-                              <td className="px-4 py-2">{tab.customerName || '-'}</td>
-                              <td className="px-4 py-2 text-red-600 font-bold">Ksh {tab.status !== 'completed' ? tab.total.toFixed(2) : '0.00'}</td>
-                              <td className="px-4 py-2">
-                                <Badge className={getStatusColor(tab.status)}>
-                                  {getStatusIcon(tab.status)}
-                                  <span className="ml-1 capitalize">{tab.status.replace('_', ' ')}</span>
-                                </Badge>
-                              </td>
-                              <td className="px-4 py-2">
-                                <Button size="sm" variant="outline">View</Button>
-                              </td>
-                            </tr>
-                          ))}
+                          {tabs.map(tab => {
+                            // Ensure we have the correct data structure
+                            const total = tab.total || tab.amount || 0;
+                            const paid = tab.status === 'completed' || tab.status === 'paid' ? total : 0;
+                            const outstanding = (tab.status !== 'completed' && tab.status !== 'paid') ? total : 0;
+                            const referenceNumber = tab.referenceNumber || tab.tabNumber || `#${tab.id.slice(-4)}`;
+                            const waiterName = tab.waiterName || tab.waiter?.name || 'Unassigned';
+                            const status = tab.status || 'active';
+                            
+                            return (
+                              <tr key={tab.id} className={tab.expired ? 'bg-red-50' : ''}>
+                                <td className="px-4 py-2 font-semibold">Tab {referenceNumber}</td>
+                                <td className="px-4 py-2">{waiterName}</td>
+                                <td className="px-4 py-2 font-medium">Ksh {total.toFixed(2)}</td>
+                                <td className="px-4 py-2 text-green-600">Ksh {paid.toFixed(2)}</td>
+                                <td className="px-4 py-2 text-red-600 font-bold">Ksh {outstanding.toFixed(2)}</td>
+                                <td className="px-4 py-2">
+                                  <Badge className={getStatusColor(status)}>
+                                    {getStatusIcon(status)}
+                                    <span className="ml-1 capitalize">{status.replace('_', ' ')}</span>
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => {
+                                      // Navigate to the tab view with tab data
+                                      navigate(`/tab/${tab.id}`, { 
+                                        state: { 
+                                          tabData: tab,
+                                          referenceNumber: referenceNumber,
+                                          waiterName: waiterName
+                                        } 
+                                      });
+                                    }}
+                                  >
+                                    View
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

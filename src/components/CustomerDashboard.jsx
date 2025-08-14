@@ -4,7 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  addDoc, 
+  updateDoc,
+  increment,
+  serverTimestamp 
+} from 'firebase/firestore';
 
 export default function CustomerDashboard() {
   const { restaurantId } = useParams();
@@ -70,7 +79,43 @@ export default function CustomerDashboard() {
     if (cart.length === 0) return;
     
     try {
+      // First, check if there's an existing tab for this customer
+      const tabsQuery = query(
+        collection(db, 'tabs'),
+        where('customerId', '==', customerId),
+        where('status', '==', 'active')
+      );
+      
+      const tabsSnapshot = await getDocs(tabsQuery);
+      let tabId;
+      let tabRef;
+      
+      if (tabsSnapshot.empty) {
+        // Create a new tab if one doesn't exist
+        const tabData = {
+          restaurantId,
+          customerId,
+          customerName,
+          status: 'active',
+          createdAt: serverTimestamp(),
+          referenceNumber: `TAB-${Math.floor(1000 + Math.random() * 9000)}`,
+          total: 0,
+          items: []
+        };
+        
+        tabRef = await addDoc(collection(db, 'tabs'), tabData);
+        tabId = tabRef.id;
+      } else {
+        // Use existing tab
+        const tabDoc = tabsSnapshot.docs[0];
+        tabId = tabDoc.id;
+        tabRef = tabDoc.ref;
+      }
+      
+      // Create order data
+      const orderTotal = cart.reduce((sum, item) => sum + item.price, 0);
       const orderData = {
+        tabId,
         restaurantId,
         customerId,
         customerName,
@@ -82,11 +127,18 @@ export default function CustomerDashboard() {
         })),
         status: 'pending',
         createdAt: serverTimestamp(),
-        tableId: 'table-1', // This would come from QR code or table selection
-        total: cart.reduce((sum, item) => sum + item.price, 0)
+        total: orderTotal
       };
 
-      await addDoc(collection(db, 'orders'), orderData);
+      // Add order to orders collection
+      const orderRef = await addDoc(collection(db, 'orders'), orderData);
+      
+      // Update tab total
+      await updateDoc(tabRef, {
+        total: increment(orderTotal),
+        updatedAt: serverTimestamp()
+      });
+      
       setOrderPlaced(true);
       setCart([]);
       

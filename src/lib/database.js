@@ -33,9 +33,13 @@ export const createTab = async (tabData) => {
   const restaurantRef = doc(db, RESTAURANTS_COLLECTION, tabData.restaurantId);
   const tabsCollectionRef = collection(db, TABS_COLLECTION);
 
-  // Validate waiter assignment before proceeding
-  if (!tabData.waiterName || !tabData.waiterId) {
-    throw new Error('Waiter assignment is required for tab creation.');
+  // For QR code scans, waiter assignment is not required initially
+  // Waiter will be assigned when the first order is placed
+  const isQrCodeScan = tabData.createdBy === 'customer';
+  
+  // Only validate waiter assignment if this is not a QR code scan
+  if (!isQrCodeScan && (!tabData.waiterName || !tabData.waiterId)) {
+    throw new Error('Waiter assignment is required for manual tab creation.');
   }
 
   try {
@@ -60,13 +64,20 @@ export const createTab = async (tabData) => {
 
       // Create the new tab document within the transaction.
       const newTabRef = doc(tabsCollectionRef); // Create a new ref with an auto-generated ID
+      
+      // Set initial status based on creation method
+      const initialStatus = isQrCodeScan ? 'inactive' : 'active';
+      
       transaction.set(newTabRef, {
         ...tabData,
-        status: 'active',
+        status: initialStatus, // Will be 'inactive' for QR scans, 'active' for manual creation
         total: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         referenceNumber: String(counter), // The new, simple, memorable tab number
+        // For QR code scans, we might not have a waiter assigned yet
+        waiterName: isQrCodeScan ? '' : tabData.waiterName,
+        waiterId: isQrCodeScan ? '' : tabData.waiterId
       });
 
       // Update the restaurant's counter and reset date within the transaction.
@@ -146,28 +157,66 @@ export const getActiveTabs = async (restaurantId) => {
 }
 
 // Order Management Functions
-export const addOrderToTab = async (tabId, orderData) => {
+export const addOrderToTab = async (tabId, orderData, waiterData = null) => {
   try {
-    // Add order to orders collection
-    const orderRef = await addDoc(collection(db, ORDERS_COLLECTION), {
+    const tabRef = doc(db, TABS_COLLECTION, tabId);
+    const ordersCollectionRef = collection(db, ORDERS_COLLECTION);
+    
+    // Get the current tab data to check its status
+    const tabDoc = await getDoc(tabRef);
+    if (!tabDoc.exists()) {
+      throw new Error('Tab not found');
+    }
+    
+    const tabData = tabDoc.data();
+    const isFirstOrder = tabData.status === 'inactive';
+
+    // Start a batch write to ensure atomic updates
+    const batch = writeBatch(db);
+
+    // 1. Add the new order
+    const orderRef = doc(ordersCollectionRef);
+    const newOrder = {
       ...orderData,
       tabId,
-      createdAt: serverTimestamp()
-    })
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    batch.set(orderRef, newOrder);
+
+    // 2. Update the tab's total and status if needed
+    const updateData = {
+      total: increment(orderData.total),
+      updatedAt: serverTimestamp(),
+    };
     
-    // Update tab total
-    const tabRef = doc(db, TABS_COLLECTION, tabId)
-    const orderTotal = orderData.price * orderData.quantity
+    // If this is the first order for an inactive tab, update status to ACTIVE
+    // and set waiter information if provided
+    if (isFirstOrder) {
+      updateData.status = 'active';
+      if (waiterData) {
+        updateData.waiterName = waiterData.name;
+        updateData.waiterId = waiterData.id;
+      }
+    }
     
-    await updateDoc(tabRef, {
-      total: increment(orderTotal),
-      updatedAt: serverTimestamp()
-    })
-    
-    return { id: orderRef.id, ...orderData }
+    batch.update(tabRef, updateData);
+
+    await batch.commit();
+
+    return { 
+      id: orderRef.id, 
+      ...newOrder,
+      tabUpdated: {
+        wasInactive: isFirstOrder,
+        newStatus: 'active',
+        waiterAssigned: isFirstOrder && !!waiterData
+      }
+    };
   } catch (error) {
-    console.error('Error adding order:', error)
-    throw error
+    console.error('Error adding order to tab:', error);
+    throw error;
   }
 }
 
@@ -303,7 +352,7 @@ export const subscribeToActiveTabs = (restaurantId, callback) => {
   const q = query(
     collection(db, TABS_COLLECTION),
     where('restaurantId', '==', restaurantId),
-    where('status', 'in', ['active', 'pending_acceptance', 'bill_accepted']),
+    where('status', '==', 'active'), // Only show 'active' tabs in RestaurantDashboard
     orderBy('createdAt', 'desc')
   )
   return onSnapshot(q, (querySnapshot) => {

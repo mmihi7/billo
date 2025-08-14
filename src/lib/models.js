@@ -4,7 +4,8 @@
 export const TabModel = {
   // Tab statuses
   STATUS: {
-    ACTIVE: 'active',
+    INACTIVE: 'inactive',        // Tab created but no orders yet (QR scan)
+    ACTIVE: 'active',            // Tab has at least one order
     PENDING_ACCEPTANCE: 'pending_acceptance',
     BILL_ACCEPTED: 'bill_accepted',
     COMPLETED: 'completed',
@@ -20,7 +21,8 @@ export const TabModel = {
     customerPhone: data.customerPhone || '',
     waiterName: data.waiterName || '',
     waiterId: data.waiterId || '',
-    status: TabModel.STATUS.ACTIVE,
+    // New tabs start as INACTIVE (will become ACTIVE when first order is placed)
+    status: TabModel.STATUS.INACTIVE,
     total: 0,
     tax: 0,
     grandTotal: 0,
@@ -36,15 +38,24 @@ export const TabModel = {
     if (!tab.restaurantId) errors.push('Restaurant ID is required');
     if (!tab.tableNumber) errors.push('Tab number is required');
     if (!tab.restaurantName) errors.push('Restaurant name is required');
-    if (!tab.waiterName) errors.push('Waiter name is required');
-    if (!tab.waiterId) errors.push('Waiter ID is required');
-    // Tabs must be created by waiters
-    if (!tab.createdBy || tab.createdBy !== 'waiter') errors.push('Tab must be created by a waiter');
+    
+    // Waiter assignment is only required for ACTIVE tabs
+    if (tab.status !== TabModel.STATUS.INACTIVE) {
+      if (!tab.waiterName) errors.push('Waiter name is required for active tabs');
+      if (!tab.waiterId) errors.push('Waiter ID is required for active tabs');
+    }
+    
     // Tabs must have a referenceNumber (tab id)
     if (!tab.referenceNumber) errors.push('Tab ID (referenceNumber) is required');
+    
     // Tabs can be in pending_acceptance status if awaiting customer acceptance
     if (tab.status === TabModel.STATUS.PENDING_ACCEPTANCE && !tab.customerAccepted) {
       errors.push('Tab is pending acceptance by customer');
+    }
+    
+    // INACTIVE tabs should have no orders
+    if (tab.status === TabModel.STATUS.INACTIVE && tab.total > 0) {
+      errors.push('Inactive tabs cannot have orders');
     }
     return {
       isValid: errors.length === 0,
