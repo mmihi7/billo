@@ -930,10 +930,25 @@ function RestaurantDashboard({ isAdminView = false }) {
 }
 
 function OnboardingSetup({ user, onRestaurantCreated }) {
+  // Common currencies with their symbols and countries
+  const currencies = [
+    { code: 'KES', name: 'Kenyan Shilling', symbol: 'KSh' },
+    { code: 'UGX', name: 'Ugandan Shilling', symbol: 'USh' },
+    { code: 'TZS', name: 'Tanzanian Shilling', symbol: 'TSh' },
+    { code: 'USD', name: 'US Dollar', symbol: '$' },
+    { code: 'EUR', name: 'Euro', symbol: '€' },
+    { code: 'GBP', name: 'British Pound', symbol: '£' },
+    { code: 'ZAR', name: 'South African Rand', symbol: 'R' },
+    { code: 'ETB', name: 'Ethiopian Birr', symbol: 'Br' },
+    { code: 'NGN', name: 'Nigerian Naira', symbol: '₦' },
+    { code: 'GHS', name: 'Ghanaian Cedi', symbol: 'GH₵' },
+  ];
+
   const [formData, setFormData] = useState({
     restaurantName: '',
     city: '',
     telephone: '',
+    currency: 'KES', // Default to Kenyan Shilling
     paymentTypes: {
       cash: false,
       card: false,
@@ -1035,6 +1050,9 @@ function OnboardingSetup({ user, onRestaurantCreated }) {
     try {
       console.log('Creating restaurant with data:', formData);
       
+      // Get the selected currency details
+      const selectedCurrency = currencies.find(c => c.code === formData.currency);
+      
       // Create the restaurant
       const newRestaurant = await createRestaurant({
         name: formData.restaurantName,
@@ -1043,7 +1061,12 @@ function OnboardingSetup({ user, onRestaurantCreated }) {
         city: formData.city,
         telephone: formData.telephone,
         paymentTypes: selectedPaymentTypes,
-        logo: logoUrl, // Add the logo URL to the restaurant data
+        logo: logoUrl,
+        currency: {
+          code: selectedCurrency.code,
+          symbol: selectedCurrency.symbol,
+          name: selectedCurrency.name
+        },
         address: {
           city: formData.city,
           // Add more address fields as needed
@@ -1160,6 +1183,27 @@ function OnboardingSetup({ user, onRestaurantCreated }) {
                     placeholder="e.g., +254 700 123456" 
                     required 
                   />
+                </div>
+                
+                <div>
+                  <Label htmlFor="currency">Currency *</Label>
+                  <select
+                    id="currency"
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleInputChange}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    required
+                  >
+                    {currencies.map(currency => (
+                      <option key={currency.code} value={currency.code}>
+                        {currency.code} - {currency.name} ({currency.symbol})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Selected: {currencies.find(c => c.code === formData.currency)?.symbol} - {currencies.find(c => c.code === formData.currency)?.name}
+                  </p>
                 </div>
                 
                 <div>

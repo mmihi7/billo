@@ -34,7 +34,7 @@ export const TabModel = {
   validate: (tab) => {
     const errors = [];
     if (!tab.restaurantId) errors.push('Restaurant ID is required');
-    if (!tab.tableNumber) errors.push('Table number is required');
+    if (!tab.tableNumber) errors.push('Tab number is required');
     if (!tab.restaurantName) errors.push('Restaurant name is required');
     if (!tab.waiterName) errors.push('Waiter name is required');
     if (!tab.waiterId) errors.push('Waiter ID is required');

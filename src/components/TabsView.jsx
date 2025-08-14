@@ -5,17 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 
-export default function TableTabsView() {
-  const { tableId } = useParams();
+export default function TabView() {
+  const { tabId } = useParams();
   const [tabs, setTabs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!tableId) return;
+    if (!tabId) return;
 
     const q = query(
       collection(db, 'tabs'),
-      where('tableId', '==', tableId),
+      where('tabId', '==', tabId),
       where('status', '==', 'open')
     );
 
@@ -55,7 +55,7 @@ export default function TableTabsView() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Table {tableId} - Active Tabs</h1>
+      <h1 className="text-2xl font-bold mb-6">Tab {tabId} - Active Orders</h1>
       
       {tabs.length === 0 ? (
         <p>No active tabs for this table</p>

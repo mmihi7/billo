@@ -1,3 +1,5 @@
 node_modules
 .env.local
 google-services.json
+firebase.json
+archive
