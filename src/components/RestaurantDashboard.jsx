@@ -721,7 +721,7 @@ function RestaurantDashboard({ isAdminView = false }) {
       <div className="min-h-screen bg-background p-4">
         {/* Menu management is now handled by the MenuManager component in the main content area */}
         <GoogleSheetConnectDialog open={isGoogleSheetDialogOpen} onOpenChange={setIsGoogleSheetDialogOpen} />
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <QRCodeGenerator
             open={isQrGeneratorOpen}
             onOpenChange={setIsQrGeneratorOpen}
@@ -815,8 +815,8 @@ function RestaurantDashboard({ isAdminView = false }) {
             </Card>
           </div>
 
-          {/* Tabs for different views */}
-          <Tabs defaultValue="tabs" className="w-full">
+          {/* Main Tabs Navigation */}
+          <Tabs defaultValue="tabs" className="w-full space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="tabs">Active Tabs</TabsTrigger>
               <TabsTrigger value="menu"><Utensils className="w-4 h-4 mr-2" />Menu</TabsTrigger>
@@ -824,6 +824,7 @@ function RestaurantDashboard({ isAdminView = false }) {
               <TabsTrigger value="payments">Payment History</TabsTrigger>
             </TabsList>
 
+            {/* Active Tabs Tab */}
             <TabsContent value="tabs" className="space-y-4">
               <Card>
                 <CardHeader>
@@ -831,7 +832,9 @@ function RestaurantDashboard({ isAdminView = false }) {
                   <CardDescription>List of all active tabs, assigned waiter, and outstanding amounts</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {showEmptyState ? <EmptyState /> : (
+                  {showEmptyState ? (
+                    <EmptyState />
+                  ) : (
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
@@ -847,7 +850,6 @@ function RestaurantDashboard({ isAdminView = false }) {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {tabs.map(tab => {
-                            // Ensure we have the correct data structure
                             const total = tab.total || tab.amount || 0;
                             const paid = tab.status === 'completed' || tab.status === 'paid' ? total : 0;
                             const outstanding = (tab.status !== 'completed' && tab.status !== 'paid') ? total : 0;
@@ -873,12 +875,11 @@ function RestaurantDashboard({ isAdminView = false }) {
                                     size="sm" 
                                     variant="outline"
                                     onClick={() => {
-                                      // Navigate to the tab view with tab data
                                       navigate(`/tab/${tab.id}`, { 
                                         state: { 
                                           tabData: tab,
-                                          referenceNumber: referenceNumber,
-                                          waiterName: waiterName
+                                          referenceNumber,
+                                          waiterName
                                         } 
                                       });
                                     }}
@@ -897,104 +898,79 @@ function RestaurantDashboard({ isAdminView = false }) {
               </Card>
             </TabsContent>
 
+            {/* Menu Tab */}
             <TabsContent value="menu" className="space-y-6">
-               {console.log('Rendering MenuManager with restaurant:', restaurant)}
-               <MenuManager restaurant={restaurant} />
+              <MenuManager restaurant={restaurant} />
             </TabsContent>
 
+            {/* Waiters Tab */}
             <TabsContent value="waiters" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Waiter Summary</CardTitle>
-                  <CardDescription>Overview of tabs, orders, sales, paid, and outstanding by waiter</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  {/* Group tabs by waiterName */}
-                  {(() => {
-                    // Group tabs by waiterName
-                    const waiterMap = {};
-                    tabs.forEach(tab => {
-                      const waiter = tab.waiterName || 'Unassigned';
-                      if (!waiterMap[waiter]) waiterMap[waiter] = [];
-                      waiterMap[waiter].push(tab);
-                    });
-                    const waiterNames = Object.keys(waiterMap);
-                    if (waiterNames.length === 0) {
-                      return <div className="text-center text-muted-foreground">No waiter activity yet.</div>;
-                    }
-                    return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                        {waiterNames.map(waiter => {
-                          const tabsForWaiter = waiterMap[waiter];
-                          const numTabs = tabsForWaiter.length;
-                          const numOrders = tabsForWaiter.reduce((sum, t) => sum + (t.orders || 0), 0);
-                          const totalSales = tabsForWaiter.reduce((sum, t) => sum + (t.total || 0), 0);
-                          const paid = tabsForWaiter.filter(t => t.status === 'completed').reduce((sum, t) => sum + (t.total || 0), 0);
-                          const outstanding = tabsForWaiter.filter(t => t.status !== 'completed').reduce((sum, t) => sum + (t.total || 0), 0);
-                          return (
-                            <div key={waiter} className="bg-card text-card-foreground flex flex-col gap-4 rounded-xl border py-6 shadow-sm overflow-hidden">
-                              <div className="px-4 pb-2">
-                                <div className="font-semibold text-lg mb-1">{waiter}</div>
-                                <div className="text-xs text-muted-foreground">Waiter</div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 px-4">
-                                <div className="flex flex-col items-center">
-                                  <span className="font-bold text-xl">{numTabs}</span>
-                                  <span className="text-xs text-muted-foreground">Tabs</span>
-                                </div>
-                                <div className="flex flex-col items-center">
-                                  <span className="font-bold text-xl">{numOrders}</span>
-                                  <span className="text-xs text-muted-foreground">Orders</span>
-                                </div>
-                                <div className="flex flex-col items-center">
-                                  <span className="font-bold text-xl">Ksh {totalSales.toFixed(2)}</span>
-                                  <span className="text-xs text-muted-foreground">Sales</span>
-                                </div>
-                                <div className="flex flex-col items-center">
-                                  <span className="font-bold text-xl">Ksh {paid.toFixed(2)}</span>
-                                  <span className="text-xs text-muted-foreground">Paid</span>
-                                </div>
-                                <div className="flex flex-col items-center col-span-2">
-                                  <span className="font-bold text-xl text-red-600">Ksh {outstanding.toFixed(2)}</span>
-                                  <span className="text-xs text-muted-foreground">Outstanding</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
+              {restaurant?.id ? (
+                <WaiterManager restaurant={restaurant} />
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Restaurant Not Loaded</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Unable to load waiter information. Please try refreshing the page.
+                    </p>
+                    <Button variant="outline" onClick={() => window.location.reload()}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Refresh Page
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
+            {/* Payments Tab */}
             <TabsContent value="payments" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Payment History</CardTitle>
-                  <CardDescription>Recent completed payments</CardDescription>
+                  <CardDescription>Recent payment transactions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {showEmptyState ? <EmptyState /> : (
+                  {payments.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">No payment history available</p>
+                    </div>
+                  ) : (
                     <div className="space-y-4">
                       {payments.map((payment) => (
-                        <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold">{payment.customerName}</h3>
-                              <Badge variant="outline">{payment.method}</Badge>
-                              <Badge className="bg-green-100 text-green-800">
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                <span>Completed</span>
-                              </Badge>
+                        <div key={payment.id} className="border rounded-lg p-4">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium">
+                                  Payment #{payment.referenceNumber || payment.id.slice(-6)}
+                                </p>
+                                {payment.customerName && (
+                                  <Badge variant="outline">{payment.customerName}</Badge>
+                                )}
+                                {payment.status === 'completed' && (
+                                  <Badge className="bg-green-100 text-green-800">
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    <span>Completed</span>
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {payment.tabId && `${payment.tabId} • `}
+                                {payment.time || (payment.timestamp?.toDate ? new Date(payment.timestamp.toDate()).toLocaleString() : '')}
+                              </p>
                             </div>
-                            <p className="text-sm text-muted-foreground">
-                              {payment.id} • {payment.tabId} • {payment.time ? payment.time : (payment.createdAt && payment.createdAt.seconds ? new Date(payment.createdAt.seconds * 1000).toLocaleTimeString() : '')}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-green-600">Ksh {typeof payment.amount === 'number' ? payment.amount.toFixed(2) : '0.00'}</p>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-green-600">
+                                Ksh {typeof payment.amount === 'number' ? payment.amount.toFixed(2) : '0.00'}
+                              </p>
+                              {payment.method && (
+                                <Badge variant="outline" className="mt-1">
+                                  {payment.method}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1009,7 +985,7 @@ function RestaurantDashboard({ isAdminView = false }) {
     )
   }
 
-  return null
+  return null;
 }
 
 function OnboardingSetup({ user, onRestaurantCreated }) {

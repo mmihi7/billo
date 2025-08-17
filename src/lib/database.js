@@ -28,6 +28,25 @@ const RESTAURANTS_COLLECTION = 'restaurants'
 const WAITERS_COLLECTION = 'waiters'
 const MENU_ITEMS_COLLECTION = 'menuItems'
 
+// Tab subscription function used by WaiterManager
+export const subscribeToTabs = (restaurantId, callback) => {
+  if (!restaurantId) return () => {};
+  
+  const q = query(
+    collection(db, TABS_COLLECTION),
+    where('restaurantId', '==', restaurantId),
+    orderBy('createdAt', 'desc')
+  );
+  
+  return onSnapshot(q, (querySnapshot) => {
+    const tabs = [];
+    querySnapshot.forEach((doc) => {
+      tabs.push({ id: doc.id, ...doc.data() });
+    });
+    callback(tabs);
+  });
+};
+
 // Tab Management Functions
 export const createTab = async (tabData) => {
   const restaurantRef = doc(db, RESTAURANTS_COLLECTION, tabData.restaurantId);
