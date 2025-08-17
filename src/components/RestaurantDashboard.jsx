@@ -905,23 +905,7 @@ function RestaurantDashboard({ isAdminView = false }) {
 
             {/* Waiters Tab */}
             <TabsContent value="waiters" className="space-y-4">
-              {restaurant?.id ? (
-                <WaiterManager restaurant={restaurant} />
-              ) : (
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
-                    <h3 className="text-lg font-medium mb-2">Restaurant Not Loaded</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Unable to load waiter information. Please try refreshing the page.
-                    </p>
-                    <Button variant="outline" onClick={() => window.location.reload()}>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Refresh Page
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+              <WaiterManager restaurant={restaurant} />
             </TabsContent>
 
             {/* Payments Tab */}
