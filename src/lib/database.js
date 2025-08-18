@@ -29,7 +29,7 @@ const WAITERS_COLLECTION = 'waiters'
 const MENU_ITEMS_COLLECTION = 'menuItems'
 
 // Tab subscription function used by WaiterManager
-export const subscribeToTabs = (restaurantId, callback) => {
+const subscribeToTabs = (restaurantId, callback) => {
   if (!restaurantId) return () => {};
   
   const q = query(
@@ -48,7 +48,7 @@ export const subscribeToTabs = (restaurantId, callback) => {
 };
 
 // Tab Management Functions
-export const createTab = async (tabData) => {
+const createTab = async (tabData) => {
   const restaurantRef = doc(db, RESTAURANTS_COLLECTION, tabData.restaurantId);
   const tabsCollectionRef = collection(db, TABS_COLLECTION);
 
@@ -84,19 +84,21 @@ export const createTab = async (tabData) => {
       // Create the new tab document within the transaction.
       const newTabRef = doc(tabsCollectionRef); // Create a new ref with an auto-generated ID
       
-      // Set initial status based on creation method
-      const initialStatus = isQrCodeScan ? 'inactive' : 'active';
+      // Force status to 'inactive' for QR code scans
+      // and ensure orderCount is set to 0 for new tabs
+      const tabStatus = isQrCodeScan ? 'inactive' : 'active';
       
       transaction.set(newTabRef, {
         ...tabData,
-        status: initialStatus, // Will be 'inactive' for QR scans, 'active' for manual creation
+        status: tabStatus,
         total: 0,
+        orderCount: 0, // Initialize order count to 0
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        referenceNumber: String(counter), // The new, simple, memorable tab number
-        // For QR code scans, we might not have a waiter assigned yet
-        waiterName: isQrCodeScan ? '' : tabData.waiterName,
-        waiterId: isQrCodeScan ? '' : tabData.waiterId
+        referenceNumber: String(counter),
+        // Clear waiter info for QR code scans
+        waiterName: isQrCodeScan ? '' : (tabData.waiterName || ''),
+        waiterId: isQrCodeScan ? '' : (tabData.waiterId || '')
       });
 
       // Update the restaurant's counter and reset date within the transaction.
@@ -122,7 +124,7 @@ export const createTab = async (tabData) => {
   }
 }
 
-export const getTabByReference = async (referenceNumber) => {
+const getTabByReference = async (referenceNumber) => {
   try {
     const q = query(
       collection(db, TABS_COLLECTION), 
@@ -142,20 +144,74 @@ export const getTabByReference = async (referenceNumber) => {
   }
 }
 
-export const updateTabStatus = async (tabId, status) => {
+/**
+ * Activates an inactive tab when a waiter is ready to take the first order
+ * @param {string} tabId - The ID of the tab to activate
+ * @param {object} waiterData - Object containing waiter information
+ * @param {string} waiterData.id - The waiter's ID
+ * @param {string} waiterData.name - The waiter's name
+ */
+const activateTab = async (tabId, waiterData) => {
+  if (!waiterData || !waiterData.id || !waiterData.name) {
+    throw new Error('Waiter information is required to activate a tab');
+  }
+
+  const tabRef = doc(db, TABS_COLLECTION, tabId);
+  
+  return runTransaction(db, async (transaction) => {
+    const tabDoc = await transaction.get(tabRef);
+    if (!tabDoc.exists()) {
+      throw new Error('Tab not found');
+    }
+    
+    const tabData = tabDoc.data();
+    
+    // Only allow activating inactive tabs
+    if (tabData.status !== 'inactive') {
+      throw new Error('Only inactive tabs can be activated');
+    }
+    
+    // Update tab with waiter information and mark as active
+    transaction.update(tabRef, {
+      status: 'active',
+      waiterId: waiterData.id,
+      waiterName: waiterData.name,
+      orderCount: 0, // Initialize order count to 0
+      updatedAt: serverTimestamp()
+    });
+  });
+};
+
+const updateTabStatus = async (tabId, status) => {
   try {
-    const tabRef = doc(db, TABS_COLLECTION, tabId)
+    const tabRef = doc(db, TABS_COLLECTION, tabId);
+    const tabDoc = await getDoc(tabRef);
+    
+    if (!tabDoc.exists()) {
+      throw new Error('Tab not found');
+    }
+    
+    const tabData = tabDoc.data();
+    
+    // Prevent setting status to 'active' without proper validation
+    if (status === 'active') {
+      // Allow activation only if we have a waiter and at least one order
+      if (!tabData.waiterId || (tabData.orderCount || 0) < 1) {
+        throw new Error('Cannot activate tab: Waiter and at least one order are required');
+      }
+    }
+    
     await updateDoc(tabRef, {
       status,
       updatedAt: serverTimestamp()
-    })
+    });
   } catch (error) {
-    console.error('Error updating tab status:', error)
-    throw error
+    console.error('Error updating tab status:', error);
+    throw error;
   }
 }
 
-export const getActiveTabs = async (restaurantId) => {
+const getActiveTabs = async (restaurantId) => {
   try {
     const q = query(
       collection(db, TABS_COLLECTION),
@@ -176,7 +232,7 @@ export const getActiveTabs = async (restaurantId) => {
 }
 
 // Order Management Functions
-export const addOrderToTab = async (tabId, orderData, waiterData = null) => {
+const addOrderToTab = async (tabId, orderData, waiterData = null) => {
   try {
     const tabRef = doc(db, TABS_COLLECTION, tabId);
     const ordersCollectionRef = collection(db, ORDERS_COLLECTION);
@@ -188,7 +244,14 @@ export const addOrderToTab = async (tabId, orderData, waiterData = null) => {
     }
     
     const tabData = tabDoc.data();
+    
+    // Check if this is the first order (tab is inactive)
     const isFirstOrder = tabData.status === 'inactive';
+    
+    // If it's the first order, we need waiter data
+    if (isFirstOrder && !waiterData) {
+      throw new Error('Waiter information is required for the first order on a new tab');
+    }
 
     // Start a batch write to ensure atomic updates
     const batch = writeBatch(db);
@@ -204,20 +267,21 @@ export const addOrderToTab = async (tabId, orderData, waiterData = null) => {
     };
     batch.set(orderRef, newOrder);
 
-    // 2. Update the tab's total and status if needed
+    // 2. Update the tab's total and status
     const updateData = {
       total: increment(orderData.total),
       updatedAt: serverTimestamp(),
     };
     
-    // If this is the first order for an inactive tab, update status to ACTIVE
-    // and set waiter information if provided
+    // If this is the first order (tab is inactive), activate the tab
     if (isFirstOrder) {
       updateData.status = 'active';
-      if (waiterData) {
-        updateData.waiterName = waiterData.name;
-        updateData.waiterId = waiterData.id;
-      }
+      updateData.waiterName = waiterData.name;
+      updateData.waiterId = waiterData.id;
+      updateData.orderCount = 1; // Initialize order count
+    } else {
+      // For subsequent orders, just increment the order count
+      updateData.orderCount = increment(1);
     }
     
     batch.update(tabRef, updateData);
@@ -239,7 +303,7 @@ export const addOrderToTab = async (tabId, orderData, waiterData = null) => {
   }
 }
 
-export const updateOrderStatus = async (orderId, status, waiterId) => {
+const updateOrderStatus = async (orderId, status, waiterId) => {
   try {
     const orderRef = doc(db, ORDERS_COLLECTION, orderId);
     
@@ -258,7 +322,7 @@ export const updateOrderStatus = async (orderId, status, waiterId) => {
   }
 }
 
-export const getTabOrders = async (tabId) => {
+const getTabOrders = async (tabId) => {
   try {
     const q = query(
       collection(db, ORDERS_COLLECTION),
@@ -278,7 +342,7 @@ export const getTabOrders = async (tabId) => {
 }
 
 // Payment Management Functions
-export const createPayment = async (paymentData) => {
+const createPayment = async (paymentData) => {
   // Prevent payment if tab has no orders
   const tabId = paymentData.tabId;
   if (!tabId) {
@@ -311,7 +375,7 @@ export const createPayment = async (paymentData) => {
   }
 }
 
-export const updatePaymentStatus = async (paymentId, status) => {
+const updatePaymentStatus = async (paymentId, status) => {
   try {
     const paymentRef = doc(db, PAYMENTS_COLLECTION, paymentId)
     await updateDoc(paymentRef, {
@@ -324,7 +388,7 @@ export const updatePaymentStatus = async (paymentId, status) => {
   }
 }
 
-export const getPaymentHistory = async (limit = 50) => {
+const getPaymentHistory = async (limit = 50) => {
   try {
     const q = query(
       collection(db, PAYMENTS_COLLECTION),
@@ -343,7 +407,7 @@ export const getPaymentHistory = async (limit = 50) => {
 }
 
 // Real-time listeners
-export const subscribeToTabUpdates = (tabId, callback) => {
+const subscribeToTabUpdates = (tabId, callback) => {
   const tabRef = doc(db, TABS_COLLECTION, tabId)
   return onSnapshot(tabRef, (doc) => {
     if (doc.exists()) {
@@ -352,7 +416,7 @@ export const subscribeToTabUpdates = (tabId, callback) => {
   })
 }
 
-export const subscribeToTabOrders = (tabId, callback) => {
+const subscribeToTabOrders = (tabId, callback) => {
   const q = query(
     collection(db, ORDERS_COLLECTION),
     where('tabId', '==', tabId),
@@ -367,39 +431,64 @@ export const subscribeToTabOrders = (tabId, callback) => {
   })
 }
 
-export const subscribeToActiveTabs = (restaurantId, callback) => {
+const subscribeToActiveTabs = (restaurantId, callback) => {
+  if (!restaurantId) {
+    console.error("subscribeToActiveTabs: restaurantId is required");
+    callback([]);
+    return () => {}; // Return dummy unsubscribe function
+  }
+
+  console.log(`[subscribeToActiveTabs] Setting up listener for active tabs in restaurant: ${restaurantId}`);
+
+  // Query for ALL active tabs in the restaurant
   const q = query(
     collection(db, TABS_COLLECTION),
     where('restaurantId', '==', restaurantId),
-    where('status', '==', 'active'), // Only show 'active' tabs in RestaurantDashboard
+    where('status', '==', 'active'),
     orderBy('createdAt', 'desc')
-  )
+  );
+  
   return onSnapshot(q, (querySnapshot) => {
+    console.log(`[subscribeToActiveTabs] Received ${querySnapshot.size} active tabs`);
     const tabs = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    }))
-    callback(tabs)
-  })
+    }));
+    callback(tabs);
+  }, (error) => {
+    console.error('[subscribeToActiveTabs] Error:', error);
+    console.error('Error in subscribeToActiveTabs:', error);
+    // Return empty array on error to prevent UI issues
+    callback([]);
+  });
 }
 
 // Restaurant Management
-export const createRestaurant = async (restaurantData) => {
+const createRestaurant = async (restaurantData) => {
   try {
-    const newRestaurantData = {
-      ...RestaurantModel.create(restaurantData),
+    // Add timestamps and default values
+    const restaurantWithMeta = {
+      ...restaurantData,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      isActive: true,
+      dailyTabCounter: 0,
+      lastTabReset: serverTimestamp()
     };
-    const docRef = await addDoc(collection(db, RESTAURANTS_COLLECTION), newRestaurantData);
-    return { id: docRef.id, ...newRestaurantData };
+
+    const docRef = await addDoc(
+      collection(db, RESTAURANTS_COLLECTION),
+      restaurantWithMeta
+    );
+
+    return { id: docRef.id, ...restaurantWithMeta };
   } catch (error) {
     console.error('Error creating restaurant:', error);
-    throw error;
+    throw new Error('Failed to create restaurant');
   }
 };
 
-export const getRestaurantByOwner = async (ownerId) => {
+const getRestaurantByOwner = async (ownerId) => {
   try {
     const q = query(
       collection(db, RESTAURANTS_COLLECTION),
@@ -418,7 +507,7 @@ export const getRestaurantByOwner = async (ownerId) => {
   }
 };
 
-export const getRestaurantById = async (restaurantId) => {
+const getRestaurantById = async (restaurantId) => {
   try {
     const docRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
     const docSnap = await getDoc(docRef);
@@ -434,7 +523,7 @@ export const getRestaurantById = async (restaurantId) => {
 };
 
 // Connection test
-export const testFirestoreConnection = async () => {
+const testFirestoreConnection = async () => {
   try {
     console.log('Testing Firestore connection...');
     const testDocRef = doc(db, 'connectionTest', 'test');
@@ -448,7 +537,7 @@ export const testFirestoreConnection = async () => {
 };
 
 // Waiter Management
-export const checkWaitersCollection = async () => {
+const checkWaitersCollection = async () => {
   try {
     console.log('[checkWaitersCollection] Fetching all waiters...');
     const waitersRef = collection(db, WAITERS_COLLECTION);
@@ -471,7 +560,7 @@ export const checkWaitersCollection = async () => {
   }
 };
 
-export const getWaiterByPin = async (restaurantId, pin) => {
+const getWaiterByPin = async (restaurantId, pin) => {
   try {
     if (!restaurantId || pin === undefined || pin === null) {
       console.error('Missing required parameters for getWaiterByPin');
@@ -515,7 +604,7 @@ export const getWaiterByPin = async (restaurantId, pin) => {
   }
 };
 
-export const getWaiterById = async (waiterId) => {
+const getWaiterById = async (waiterId) => {
   try {
     if (!waiterId) {
       console.error('No waiter ID provided');
@@ -537,7 +626,7 @@ export const getWaiterById = async (waiterId) => {
   }
 };
 
-export const getWaiters = async (restaurantId) => {
+const getWaiters = async (restaurantId) => {
   console.log(`[getWaiters] Starting to fetch waiters for restaurant: ${restaurantId}`);
   
   if (!restaurantId) {
@@ -586,7 +675,7 @@ export const getWaiters = async (restaurantId) => {
   }
 };
 
-export const createWaiter = async (waiterData) => {
+const createWaiter = async (waiterData) => {
   try {
     const newWaiterData = {
       ...WaiterModel.create(waiterData),
@@ -601,7 +690,7 @@ export const createWaiter = async (waiterData) => {
   }
 };
 
-export const subscribeToWaiters = (restaurantId, callback) => {
+const subscribeToWaiters = (restaurantId, callback) => {
   console.log('subscribeToWaiters called with restaurantId:', restaurantId);
   
   try {
@@ -635,7 +724,7 @@ export const subscribeToWaiters = (restaurantId, callback) => {
   }
 };
 
-export const deleteWaiter = async (waiterId) => {
+const deleteWaiter = async (waiterId) => {
   try {
     await deleteDoc(doc(db, WAITERS_COLLECTION, waiterId));
   } catch (error) {
@@ -645,7 +734,7 @@ export const deleteWaiter = async (waiterId) => {
 };
 
 // Menu Management
-export const createMenuItem = async (itemData) => {
+const createMenuItem = async (itemData) => {
   try {
     console.log('Creating menu item with data:', itemData);
     const newItemData = {
@@ -665,7 +754,7 @@ export const createMenuItem = async (itemData) => {
   }
 };
 
-export const subscribeToMenu = (restaurantId, callback) => {
+const subscribeToMenu = (restaurantId, callback) => {
   console.log('Setting up menu subscription for restaurant:', restaurantId);
   
   try {
@@ -710,7 +799,7 @@ export const subscribeToMenu = (restaurantId, callback) => {
   }
 };
 
-export const updateMenuItem = async (itemId, itemData) => {
+const updateMenuItem = async (itemId, itemData) => {
   try {
     console.log('Updating menu item:', itemId, 'with data:', itemData);
     const itemRef = doc(db, MENU_ITEMS_COLLECTION, itemId);
@@ -741,7 +830,7 @@ export const updateMenuItem = async (itemId, itemData) => {
   }
 };
 
-export const deleteMenuItem = async (itemId) => {
+const deleteMenuItem = async (itemId) => {
   try {
     await deleteDoc(doc(db, MENU_ITEMS_COLLECTION, itemId));
   } catch (error) {
@@ -751,7 +840,7 @@ export const deleteMenuItem = async (itemId) => {
 };
 
 // Utility functions
-export const generateQRCodeData = (restaurantId, tableNumber) => {
+const generateQRCodeData = (restaurantId, tableNumber) => {
   return {
     restaurantId,
     tableNumber,
@@ -759,11 +848,63 @@ export const generateQRCodeData = (restaurantId, tableNumber) => {
   }
 }
 
-export const parseQRCodeData = (qrData) => {
+const parseQRCodeData = (qrData) => {
   try {
     return JSON.parse(qrData)
   } catch (error) {
     console.error('Error parsing QR code data:', error)
     return null
   }
+}
+
+export {
+  // Tab Management
+  createTab,
+  getTabByReference,
+  activateTab,
+  updateTabStatus,
+  getActiveTabs,
+  
+  // Order Management
+  addOrderToTab,
+  updateOrderStatus,
+  getTabOrders,
+  
+  // Payment Management
+  createPayment,
+  updatePaymentStatus,
+  getPaymentHistory,
+  
+  // Real-time Listeners
+  subscribeToTabUpdates,
+  subscribeToTabOrders,
+  subscribeToActiveTabs,
+  subscribeToTabs,
+  
+  // Restaurant Management
+  createRestaurant,
+  getRestaurantByOwner,
+  getRestaurantById,
+  
+  // Connection Test
+  testFirestoreConnection,
+  
+  // Waiter Management
+  checkWaitersCollection,
+  getWaiterByPin,
+  getWaiterById,
+  getWaiters,
+  createWaiter,
+  subscribeToWaiters,
+  deleteWaiter,
+  
+  // Menu Management
+  createMenuItem,
+  subscribeToMenu,
+  updateMenuItem,
+  deleteMenuItem,
+  
+  // Utility Functions
+  generateQRCodeData,
+  parseQRCodeData
 }

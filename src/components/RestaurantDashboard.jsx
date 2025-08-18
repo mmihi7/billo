@@ -16,7 +16,7 @@ import { sendEmailVerification } from 'firebase/auth'
 import WaiterManager from './WaiterManager'
 import MenuManager from './MenuManager'
 import QRCodeGenerator from './QRCodeGenerator'
-import { ArrowLeft, BarChart3, Users, DollarSign, Clock, CheckCircle, AlertCircle, LogOut, UserPlus, LogIn, QrCode, Utensils, ClipboardList, FileText, Plus, FileSpreadsheet, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BarChart3, Users, DollarSign, Clock, CheckCircle, AlertCircle, LogOut, UserPlus, LogIn, QrCode, Utensils, ClipboardList, FileText, Plus, FileSpreadsheet, RefreshCw, ShoppingBag } from 'lucide-react'
 
 function RestaurantDashboard({ isAdminView = false }) {
   const navigate = useNavigate()
@@ -207,13 +207,10 @@ function RestaurantDashboard({ isAdminView = false }) {
 
   const [stats, setStats] = useState({
     activeTabs: 0,
-    totalRevenue: 0,
-    pendingBills: 0,
-    completedPayments: 0
+    orders: 0,
+    sales: 0,
+    outstanding: 0
   });
-
-  // Mock data
-  // ...existing code...
 
   // Effect to load data based on auth state
   useEffect(() => {
@@ -257,13 +254,30 @@ function RestaurantDashboard({ isAdminView = false }) {
 
   // Effect to calculate stats whenever real data changes
   useEffect(() => {
+    console.log('Tabs data:', tabs); // Debug log
+    // Filter active tabs
+    const activeTabs = tabs.filter(tab => tab.status === 'active');
+    
+    // Calculate total sales from active tabs
+    const totalSales = activeTabs.reduce((sum, tab) => sum + (tab.total || 0), 0);
+    
+    // Calculate total outstanding (total - paid) for active tabs
+    const totalOutstanding = activeTabs.reduce((sum, tab) => {
+      const total = tab.total || 0;
+      const paid = tab.paid || 0;
+      return sum + Math.max(total - paid, 0);
+    }, 0);
+    
+    // Count total orders across all active tabs using orderCount field
+    const totalOrders = activeTabs.reduce((sum, tab) => sum + (tab.orderCount || 0), 0);
+
     setStats({
-      activeTabs: tabs.length,
-      totalRevenue: payments.reduce((sum, p) => sum + p.amount, 0),
-      pendingBills: tabs.filter(t => t.status === 'pending_acceptance').length,
-      completedPayments: payments.length
-    })
-  }, [tabs, payments])
+      activeTabs: activeTabs.length,
+      orders: totalOrders,
+      sales: totalSales,
+      outstanding: totalOutstanding
+    });
+  }, [tabs])
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -781,10 +795,22 @@ function RestaurantDashboard({ isAdminView = false }) {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center">
+                  <ShoppingBag className="w-8 h-8 text-purple-600 mr-3" />
+                  <div>
+                    <p className="text-2xl font-bold">{stats.orders}</p>
+                    <p className="text-sm text-muted-foreground">Total Orders</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
                   <DollarSign className="w-8 h-8 text-green-600 mr-3" />
                   <div>
-                    <p className="text-2xl font-bold">Ksh {stats.totalRevenue.toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground">Today's Revenue</p>
+                    <p className="text-2xl font-bold">Ksh {stats.sales.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">Total Sales</p>
                   </div>
                 </div>
               </CardContent>
@@ -795,20 +821,8 @@ function RestaurantDashboard({ isAdminView = false }) {
                 <div className="flex items-center">
                   <AlertCircle className="w-8 h-8 text-yellow-600 mr-3" />
                   <div>
-                    <p className="text-2xl font-bold">{stats.pendingBills}</p>
-                    <p className="text-sm text-muted-foreground">Pending Bills</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center">
-                  <CheckCircle className="w-8 h-8 text-green-600 mr-3" />
-                  <div>
-                    <p className="text-2xl font-bold">{stats.completedPayments}</p>
-                    <p className="text-sm text-muted-foreground">Completed Payments</p>
+                    <p className="text-2xl font-bold">Ksh {stats.outstanding.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">Outstanding</p>
                   </div>
                 </div>
               </CardContent>
@@ -818,7 +832,10 @@ function RestaurantDashboard({ isAdminView = false }) {
           {/* Main Tabs Navigation */}
           <Tabs defaultValue="tabs" className="w-full space-y-4">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="tabs">Active Tabs</TabsTrigger>
+              <TabsTrigger value="tabs" className="flex items-center">
+                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                Active Tabs
+              </TabsTrigger>
               <TabsTrigger value="menu"><Utensils className="w-4 h-4 mr-2" />Menu</TabsTrigger>
               <TabsTrigger value="waiters"><Users className="w-4 h-4 mr-2" />Waiters</TabsTrigger>
               <TabsTrigger value="payments">Payment History</TabsTrigger>
@@ -832,8 +849,19 @@ function RestaurantDashboard({ isAdminView = false }) {
                   <CardDescription>List of all active tabs, assigned waiter, and outstanding amounts</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {showEmptyState ? (
-                    <EmptyState />
+                  {isLoadingData ? (
+                    <div className="flex justify-center items-center p-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                      <span className="ml-2">Loading active tabs...</span>
+                    </div>
+                  ) : showEmptyState || tabs.length === 0 ? (
+                    <div className="text-center p-8 text-gray-500">
+                      <ClipboardList className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">No active tabs</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Active tabs will appear here when customers start ordering.
+                      </p>
+                    </div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
