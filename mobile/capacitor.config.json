@@ -1,0 +1,12 @@
+{
+  "appId": "com.billo.customer",
+  "appName": "BillO Customer",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "path": "android"
+  }
+}

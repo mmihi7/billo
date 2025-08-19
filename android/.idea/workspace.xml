@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AndroidLayouts">
+    <shared>
+      <config />
+    </shared>
+  </component>
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="2143f89d-bf78-40f3-bd96-e4c3a4cfbb8e" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/capacitor.build.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/proguard-rules.pro" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/billo/app/BilloApplication.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/billo/app/MainActivity.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/billo/app/services/FirebaseInstanceIDService.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/billo/app/services/FirebaseMessagingService.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-land-hdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-land-mdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-land-xhdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-land-xxhdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-land-xxxhdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-port-hdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-port-mdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-port-xhdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-port-xxhdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-port-xxxhdpi/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-v24/ic_launcher_foreground.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable/ic_launcher_background.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable/splash.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_main.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-hdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-hdpi/ic_launcher_round.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-ldpi/ic_launcher_round.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-mdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-mdpi/ic_launcher_round.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xhdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xxhdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/values/ic_launcher_background.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/values/strings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/values/styles.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/xml/file_paths.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/xml/network_security_config.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/capacitor.settings.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradlew" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradlew.bat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/variables.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../capacitor.config.json" beforeDir="false" afterPath="$PROJECT_DIR$/../capacitor.config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../dist/assets/index-BRs_ijSr.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../dist/assets/index-BdbBizHj.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../dist/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/../dist/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../firestore.rules" beforeDir="false" afterPath="$PROJECT_DIR$/../firestore.rules" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../package.json" beforeDir="false" afterPath="$PROJECT_DIR$/../package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../pnpm-lock.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../public/ads.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../public/favicon.ico" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../public/favicon.ico.bak" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../public/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/App.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/App.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/assets/react.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/AdComponent.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/AdComponents.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/CustomerApp.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/CustomerDashboard.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/CustomerNameInput.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/EmptyState.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/HomePage.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/InventoryManager.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/LandingPage.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/MenuManager.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/PinPad.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/QRCodeGenerator.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/QRCodeScanner.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/RestaurantDashboard.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/SubscriptionManager.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/TabsView.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/WaiterDashboard.fixed.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/WaiterDashboard.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/WaiterDashboard.jsx.backup" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/WaiterDashboard.jsx.clean" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/WaiterDashboardNew.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/WaiterDashboardNew.old.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/WaiterHome.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/WaiterManager.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/accordion.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/alert-dialog.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/alert.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/aspect-ratio.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/avatar.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/badge.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/breadcrumb.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/button.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/calendar.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/card.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/carousel.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/chart.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/checkbox.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/collapsible.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/command.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/context-menu.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/dialog.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/drawer.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/dropdown-menu.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/form.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/hover-card.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/input-otp.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/input.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/label.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/menubar.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/navigation-menu.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/pagination.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/popover.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/progress.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/radio-group.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/resizable.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/scroll-area.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/select.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/separator.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/sheet.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/sidebar.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/skeleton.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/slider.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/sonner.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/switch.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/table.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/tabs.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/textarea.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/toggle-group.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/toggle.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/components/ui/tooltip.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/contexts/AuthContext.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/hooks/use-mobile.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/index.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/lib/auth.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/lib/database.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/lib/firebase.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/lib/models.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/lib/subscription.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/lib/utils.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/main.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../src/utils/currency.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../vite.config.js" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=R58W316Q3GL)]" />
+  <component name="ExternalProjectsData">
+    <projectState path="$PROJECT_DIR$">
+      <ProjectState />
+    </projectState>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="31SsGjhL73dU9r7EVElcMdROOki" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Android App.app.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "ResourceManagerPrefKey.ModuleName": "android.app.main",
+    "ResourceManagerPrefKey.ResourceType": "MIPMAP",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "com.google.services.firebase.aqiPopupShown": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "C:/Users/mwene/OneDrive/Documents/BILL-O/bill-o-app/bill-o-app/android"
+  }
+}]]></component>
+  <component name="RunManager">
+    <configuration name="app" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
+      <module name="android.app" />
+      <option name="ANDROID_RUN_CONFIGURATION_SCHEMA_VERSION" value="1" />
+      <option name="DEPLOY" value="true" />
+      <option name="DEPLOY_APK_FROM_BUNDLE" value="false" />
+      <option name="DEPLOY_AS_INSTANT" value="false" />
+      <option name="ARTIFACT_NAME" value="" />
+      <option name="PM_INSTALL_OPTIONS" value="" />
+      <option name="ALL_USERS" value="false" />
+      <option name="ALWAYS_INSTALL_WITH_PM" value="false" />
+      <option name="ALLOW_ASSUME_VERIFIED" value="false" />
+      <option name="CLEAR_APP_STORAGE" value="false" />
+      <option name="DYNAMIC_FEATURES_DISABLED_LIST" value="" />
+      <option name="ACTIVITY_EXTRA_FLAGS" value="" />
+      <option name="MODE" value="default_activity" />
+      <option name="RESTORE_ENABLED" value="false" />
+      <option name="RESTORE_FILE" value="" />
+      <option name="RESTORE_FRESH_INSTALL_ONLY" value="false" />
+      <option name="CLEAR_LOGCAT" value="false" />
+      <option name="SHOW_LOGCAT_AUTOMATICALLY" value="false" />
+      <option name="TARGET_SELECTION_MODE" value="DEVICE_AND_SNAPSHOT_COMBO_BOX" />
+      <option name="SELECTED_CLOUD_MATRIX_CONFIGURATION_ID" value="-1" />
+      <option name="SELECTED_CLOUD_MATRIX_PROJECT_ID" value="" />
+      <option name="DEBUGGER_TYPE" value="Auto" />
+      <Auto>
+        <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
+        <option name="SHOW_STATIC_VARS" value="true" />
+        <option name="WORKING_DIR" value="" />
+        <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
+        <option name="SHOW_OPTIMIZED_WARNING" value="true" />
+        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+        <option name="DEBUG_SANDBOX_SDK" value="false" />
+      </Auto>
+      <Hybrid>
+        <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
+        <option name="SHOW_STATIC_VARS" value="true" />
+        <option name="WORKING_DIR" value="" />
+        <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
+        <option name="SHOW_OPTIMIZED_WARNING" value="true" />
+        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+        <option name="DEBUG_SANDBOX_SDK" value="false" />
+      </Hybrid>
+      <Java>
+        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+        <option name="DEBUG_SANDBOX_SDK" value="false" />
+      </Java>
+      <Native>
+        <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
+        <option name="SHOW_STATIC_VARS" value="true" />
+        <option name="WORKING_DIR" value="" />
+        <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
+        <option name="SHOW_OPTIMIZED_WARNING" value="true" />
+        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
+        <option name="DEBUG_SANDBOX_SDK" value="false" />
+      </Native>
+      <Profilers>
+        <option name="ADVANCED_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_CPU_PROFILING_ENABLED" value="false" />
+        <option name="STARTUP_CPU_PROFILING_CONFIGURATION_NAME" value="Java/Kotlin Method Sample (legacy)" />
+        <option name="STARTUP_NATIVE_MEMORY_PROFILING_ENABLED" value="false" />
+        <option name="NATIVE_MEMORY_SAMPLE_RATE_BYTES" value="2048" />
+      </Profilers>
+      <option name="DEEP_LINK" value="" />
+      <option name="ACTIVITY" value="" />
+      <option name="ACTIVITY_CLASS" value="" />
+      <option name="SEARCH_ACTIVITY_IN_GLOBAL_SCOPE" value="false" />
+      <option name="SKIP_ACTIVITY_VALIDATION" value="false" />
+      <method v="2">
+        <option name="Android.Gradle.BeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="2143f89d-bf78-40f3-bd96-e4c3a4cfbb8e" name="Changes" comment="" />
+      <created>1755528716653</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1755528716653</updated>
+    </task>
+    <servers />
+  </component>
+</project>

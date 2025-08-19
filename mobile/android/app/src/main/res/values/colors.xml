@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="colorPrimary">#6200EE</color>
+    <color name="colorPrimaryLight">#9E47FF</color>
+    <color name="colorPrimaryVariant">#3700B3</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+    
+    <!-- Secondary Colors -->
+    <color name="colorSecondary">#03DAC6</color>
+    <color name="colorSecondaryVariant">#018786</color>
+    <color name="colorOnSecondary">#000000</color>
+    
+    <!-- Background Colors -->
+    <color name="colorBackground">#FFFFFF</color>
+    <color name="colorOnBackground">#000000</color>
+    <color name="colorSurface">#FFFFFF</color>
+    <color name="colorOnSurface">#000000</color>
+    <color name="colorError">#B00020</color>
+    <color name="colorOnError">#FFFFFF</color>
+    
+    <!-- Status Colors -->
+    <color name="yellow_light">#FFF8E1</color>
+    <color name="yellow_dark">#FF8F00</color>
+    
+    <color name="green_light">#E8F5E9</color>
+    <color name="green_dark">#2E7D32</color>
+    
+    <color name="red_light">#FFEBEE</color>
+    <color name="red_dark">#C62828</color>
+    
+    <color name="blue_light">#E3F2FD</color>
+    <color name="blue_dark">#1565C0</color>
+    
+    <color name="gray_light">#F5F5F5</color>
+    <color name="gray_dark">#616161</color>
+    
+    <!-- Other Colors -->
+    <color name="card_stroke">#E0E0E0</color>
+    <color name="divider">#1F000000</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#DE000000</color>
+    <color name="text_secondary">#8A000000</color>
+    <color name="text_hint">#61000000</color>
+    <color name="text_disabled">#1F000000</color>
+
+    
+    <color name="purple_500">#FF6200EE</color> <!-- Example purple color -->
+    <color name="purple_700">#FF3700B3</color> <!-- Example darker purple color -->
+    <color name="white">#FFFFFFFF</color>    <!-- Standard white color -->
+
+    <color name="black">#FF000000</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+
+</resources>
+
+
+    

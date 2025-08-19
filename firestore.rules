@@ -1,84 +1,149 @@
 rules_version = '2';
 service cloud.firestore {
+  // Helper functions
+  function isAuthenticated() {
+    return request.auth != null;
+  }
+  
+  function isDeviceOwner(deviceId) {
+    return request.auth != null && request.auth.uid == deviceId;
+  }
+  
+  function isRestaurantStaff(restaurantId) {
+    return isAuthenticated() && 
+           exists(/databases/$(database)/documents/restaurants/$(restaurantId)/staff/$(request.auth.uid));
+  }
+  
+  function isTabOwner(tabId) {
+    return isAuthenticated() && 
+           get(/databases/$(database)/documents/tabs/$(tabId)).data.deviceId == request.auth.uid;
+  }
+  
+  function isTabInRestaurant(tabId, restaurantId) {
+    return get(/databases/$(database)/documents/tabs/$(tabId)).data.restaurantId == restaurantId;
+  }
+  
+  function isValidTabStatus() {
+    return request.resource.data.status in ['active', 'closed', 'pending_payment'];
+  }
+  
+  function isValidOrderStatus() {
+    return request.resource.data.status in ['pending', 'accepted', 'issue_reported', 'cancelled'];
+  }
+  
+  function isValidPaymentStatus() {
+    return request.resource.data.status in ['pending', 'completed', 'failed', 'refunded'];
+  }
+
   match /databases/{database}/documents {
+    // Devices collection - only the device owner can access their own record
+    match /devices/{deviceId} {
+      allow read, update: if isDeviceOwner(deviceId);
+      allow create: if isAuthenticated() && request.resource.data.id == request.auth.uid;
+      allow delete: if false; // Prevent deletion of device records
+    }
     
-    // Tabs collection rules
+    // Tabs collection
     match /tabs/{tabId} {
-      // Allow read access to anyone with the tab reference number
-      allow read: if true;
+      // Device can read/write their own tab
+      allow read, update: if isTabOwner(tabId) && 
+                         (request.resource == null || isValidTabStatus());
       
-      // Allow create for new tabs
-      allow create: if request.auth != null || true; // Allow anonymous for demo
+      // Device can create a new tab for themselves
+      allow create: if isAuthenticated() && 
+                    request.resource.data.deviceId == request.auth.uid &&
+                    !exists(/databases/$(database)/documents/tabs/$(tabId));
       
-      // Allow update for status changes and total updates
-      allow update: if request.auth != null || true; // Allow anonymous for demo
+      // Restaurant staff can read/update tabs for their restaurant
+      allow read, update: if isRestaurantStaff(resource.data.restaurantId) && 
+                         (request.resource == null || isValidTabStatus());
       
-      // Prevent deletion of tabs
+      // No one can delete tabs
       allow delete: if false;
     }
     
-    // Orders collection rules
+    // Orders collection
     match /orders/{orderId} {
-      // Allow read access to orders
-      allow read: if true;
+      // Device can read their own orders
+      allow read: if isTabOwner(resource.data.tabId);
       
-      // Allow create for new orders
-      allow create: if request.auth != null || true; // Allow anonymous for demo
+      // Only staff can create orders (always starts as 'pending')
+      allow create: if isRestaurantStaff(request.resource.data.restaurantId) && 
+                    request.resource.data.status == 'pending';
       
-      // Prevent updates and deletions of orders
-      allow update, delete: if false;
+      // Device can:
+      // 1. Accept pending orders
+      // 2. Report issues on accepted orders
+      // 3. Cancel unopened orders
+      allow update: if isTabOwner(resource.data.tabId) && (
+        // Accepting a pending order
+        (resource.data.status == 'pending' &&
+         request.resource.data.status == 'accepted' &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'updatedAt'])) ||
+        
+        // Reporting an issue on an accepted order
+        (resource.data.status == 'accepted' &&
+         request.resource.data.status == 'issue_reported' &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'issueNotes', 'updatedAt'])) ||
+           
+        // Cancelling an unopened order
+        (resource.data.status == 'accepted' &&
+         request.resource.data.status == 'cancelled' &&
+         resource.data.items.every(item => !item.isOpened) &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'cancellationReason', 'updatedAt']))
+      );
+      
+      // Staff can update any order field but not change the status directly
+      allow update: if isRestaurantStaff(resource.data.restaurantId) &&
+                   (request.resource == null || 
+                    request.resource.data.status == resource.data.status);
+      
+      // No one can delete orders
+      allow delete: if false;
+      
+      // Items subcollection for drink orders that need delayed acceptance
+      match /items/{itemId} {
+        allow read: if isTabOwner(get(/databases/$(database)/documents/orders/$(orderId)).data.tabId) ||
+                         isRestaurantStaff(get(/databases/$(database)/documents/orders/$(orderId)).data.restaurantId);
+        allow write: if isRestaurantStaff(get(/databases/$(database)/documents/orders/$(orderId)).data.restaurantId);
+      }
     }
     
-    // Payments collection rules
+    // Payments collection
     match /payments/{paymentId} {
-      // Allow read access to payments
-      allow read: if true;
+      // Device can read their own payments
+      allow read: if isTabOwner(resource.data.tabId);
       
-      // Allow create for new payments
-      allow create: if request.auth != null || true; // Allow anonymous for demo
+      // Device can create payments for their tab
+      allow create: if isTabOwner(request.resource.data.tabId) && 
+                    request.resource.data.status == 'pending';
       
-      // Allow update for payment status changes
-      allow update: if request.auth != null || true; // Allow anonymous for demo
+      // Restaurant staff can read/update payments for their restaurant
+      allow read, update: if isRestaurantStaff(resource.data.restaurantId) && 
+                         (request.resource == null || isValidPaymentStatus());
       
-      // Prevent deletion of payments
+      // No one can delete payments
       allow delete: if false;
     }
     
-    // Restaurants collection rules
+    // Restaurants collection
     match /restaurants/{restaurantId} {
-      // Allow read access to restaurant info
-      allow read: if true; // Publicly readable
-      
-      // Any authenticated user can create a restaurant, but must set themselves as owner
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
-      
-      // Only the owner of the restaurant can update it
-      allow update: if request.auth != null && request.auth.uid == resource.data.ownerId;
-      
-      // Prevent deletion of restaurants
-      allow delete: if false;
-    }
-    
-    // Menu items collection rules
-    match /menuItems/{itemId} {
-      // Allow read access to menu items
+      // Public read access
       allow read: if true;
       
-      // Only authenticated users can manage menu items
-      allow create, update, delete: if request.auth != null;
-    }
-    
-    // Waiters collection rules (for authentication)
-    match /waiters/{waiterId} {
-      // Allow read access for waiter info
-      allow read: if request.auth != null || true; // Allow anonymous for demo
+      // Only restaurant owners can update their restaurant
+      allow write: if isAuthenticated() && 
+                   resource.data.ownerId == request.auth.uid;
       
-      // Only authenticated users can manage waiters
-      allow create, update, delete: if request.auth != null;
+      // Staff subcollection
+      match /staff/{staffId} {
+        // Only restaurant owners can manage staff
+        allow read, write: if isAuthenticated() && 
+                           get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerId == request.auth.uid;
+      }
     }
   }
 }
-
-// Note: For production, you should implement proper authentication
-// and restrict access based on user roles and ownership.
-// The current rules allow anonymous access for demo purposes.

@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bill-O</string>
+    <string name="title_activity_main">Bill-O</string>
+    <string name="package_name">com.billo.app</string>
+    <string name="custom_url_scheme">com.billo.app</string>
+    
+    <!-- Order Status -->
+    <string name="order_status_pending">Pending</string>
+    <string name="order_status_accepted">Accepted</string>
+    <string name="order_status_issue_reported">Issue Reported</string>
+    <string name="order_status_cancelled">Cancelled</string>
+    <string name="order_status_completed">Completed</string>
+    
+    <!-- Tab Status -->
+    <string name="tab_status_active">Active</string>
+    <string name="tab_status_pending_bill">Pending Bill</string>
+    <string name="tab_status_payment_pending">Payment Pending</string>
+    <string name="tab_status_paid">Paid</string>
+    <string name="tab_status_cancelled">Cancelled</string>
+    
+    <!-- Order Actions -->
+    <string name="accept">Accept</string>
+    <string name="cancel">Cancel</string>
+    <string name="report_issue">Report Issue</string>
+    <string name="view_details">View Details</string>
+    <string name="view_issue">View Issue</string>
+    <string name="cancel_order">Cancel Order</string>
+    <string name="close">Close</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    
+    <!-- Tab Actions -->
+    <string name="request_bill">Request Bill</string>
+    <string name="bill_requested">Bill Requested</string>
+    <string name="payment_pending">Payment Pending</string>
+    <string name="paid">Paid</string>
+    <string name="cancelled">Cancelled</string>
+    
+    <!-- Messages -->
+    <string name="order_number">Order #%1$s</string>
+    <string name="price_format">Ksh %1$.2f</string>
+    <string name="no_orders_available">No orders available</string>
+    <string name="no_active_tab">No active tab found</string>
+    <string name="your_tab">Your Tab</string>
+    <string name="table_number">Table: %1$s</string>
+    <string name="order_history">Order History</string>
+    <string name="processing_payment">Processing payment…</string>
+    
+    <!-- Bottom Navigation -->
+    <string name="title_orders">Orders</string>
+    <string name="title_tab">My Tab</string>
+    <string name="title_profile">Profile</string>
+    <string name="desc_orders">View your orders</string>
+    <string name="desc_tab">View your tab</string>
+    <string name="desc_profile">View your profile</string>
+    
+    <!-- Confirmations -->
+    <string name="cancel_order_confirmation">Are you sure you want to cancel this order?</string>
+    <string name="request_bill_confirmation">Are you sure you want to request the bill? A staff member will assist you shortly.</string>
+    <string name="reported_issue">Reported Issue</string>
+    <string name="no_issue_notes">No additional notes provided</string>
+    
+    <!-- Errors -->
+    <string name="error_loading_orders">Failed to load orders. Please try again.</string>
+    <string name="error_loading_tab">Failed to load tab information. Please try again.</string>
+    <string name="error_requesting_bill">Failed to request bill. Please try again.</string>
+    <string name="error_processing_payment">Failed to process payment. Please try again.</string>
+    <string name="error_accepting_order">Failed to accept order. Please try again.</string>
+    <string name="error_reporting_issue">Failed to report issue. Please try again.</string>
+    <string name="error_cancelling_order">Failed to cancel order. Please try again.</string>
+    
+    <!-- Tab Titles -->
+    <string name="tab_orders">Orders</string>
+    <string name="tab_tab">My Tab</string>
+    <string name="tab_profile">Profile</string>
+    
+    <!-- Plurals -->
+    <plurals name="item_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+</resources>
