@@ -47,6 +47,24 @@
     <string name="order_history">Order History</string>
     <string name="processing_payment">Processing payment…</string>
     
+    <!-- Home Screen -->
+    <string name="welcome_to_billo">Welcome to Bill-O</string>
+    <string name="connect_to_restaurant_desc">Connect to a restaurant to start ordering and managing your tab</string>
+    <string name="connect_to_restaurant">Connect to Restaurant</string>
+    <string name="scan_qr_to_connect">Scan QR code to connect to a restaurant</string>
+    <string name="scan_now">SCAN NOW</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="saved_restaurants">Saved Restaurants</string>
+    <string name="view_saved_restaurants">View your saved restaurants</string>
+    <string name="easy_billing">Easy Billing</string>
+    <string name="manage_payment_methods">Manage payment methods</string>
+    
+    <!-- Navigation -->
+    <string name="title_home">Home</string>
+    <string name="title_saved_restaurants">Saved</string>
+    <string name="title_easy_billing">Billing</string>
+    <string name="title_qr_scanner">Scan QR Code</string>
+    
     <!-- Bottom Navigation -->
     <string name="title_orders">Orders</string>
     <string name="title_tab">My Tab</string>

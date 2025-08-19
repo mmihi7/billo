@@ -15,11 +15,10 @@ import androidx.core.app.NotificationCompat;
 
 import com.billo.app.MainActivity;
 import com.billo.app.R;
-import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
-public class FirebaseMessagingService extends FirebaseMessagingService {
-    private static final String TAG = "FirebaseMsgService";
+public class BilloFirebaseMessagingService extends com.google.firebase.messaging.FirebaseMessagingService {
+    private static final String TAG = "BilloFirebaseMsg";
     private static final String CHANNEL_ID = "billo_notifications";
 
     @Override
@@ -59,14 +58,14 @@ public class FirebaseMessagingService extends FirebaseMessagingService {
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(
-            this, 
-            0, 
+            this,
+            0,
             intent,
             PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE
         );
 
         Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-        
+
         NotificationCompat.Builder notificationBuilder =
             new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)

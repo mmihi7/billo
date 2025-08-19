@@ -3,27 +3,34 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/navigation_orders">
+    app:startDestination="@+id/navigation_home">
 
-    <!-- Orders Fragment -->
+    <!-- Home Fragment -->
     <fragment
-        android:id="@+id/navigation_orders"
-        android:name="com.billo.app.ui.orders.OrdersFragment"
-        android:label="@string/title_orders"
-        tools:layout="@layout/fragment_orders" />
+        android:id="@+id/navigation_home"
+        android:name="com.billo.app.ui.home.HomeFragment"
+        android:label="@string/title_home"
+        tools:layout="@layout/fragment_home" />
 
-    <!-- Tab Fragment -->
+    <!-- Saved Restaurants Fragment -->
     <fragment
-        android:id="@+id/navigation_tab"
-        android:name="com.billo.app.ui.tab.TabFragment"
-        android:label="@string/title_tab"
-        tools:layout="@layout/fragment_tab" />
+        android:id="@+id/navigation_saved_restaurants"
+        android:name="com.billo.app.ui.saved.SavedRestaurantsFragment"
+        android:label="@string/title_saved_restaurants"
+        tools:layout="@layout/fragment_saved_restaurants" />
 
-    <!-- Profile Fragment -->
+    <!-- Easy Billing Fragment -->
     <fragment
-        android:id="@+id/navigation_profile"
-        android:name="com.billo.app.ui.profile.ProfileFragment"
-        android:label="@string/title_profile"
-        tools:layout="@layout/fragment_profile" />
+        android:id="@+id/navigation_easy_billing"
+        android:name="com.billo.app.ui.billing.EasyBillingFragment"
+        android:label="@string/title_easy_billing"
+        tools:layout="@layout/fragment_easy_billing" />
+        
+    <!-- QR Code Scanner Fragment -->
+    <fragment
+        android:id="@+id/navigation_qr_scanner"
+        android:name="com.billo.app.ui.qr.QrScannerFragment"
+        android:label="@string/title_qr_scanner"
+        tools:layout="@layout/fragment_qr_scanner" />
 
 </navigation>
