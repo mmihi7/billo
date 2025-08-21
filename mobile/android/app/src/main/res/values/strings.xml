@@ -65,6 +65,26 @@
     <string name="title_easy_billing">Billing</string>
     <string name="title_qr_scanner">Scan QR Code</string>
     
+    <!-- QR Scanner -->
+    <!-- QR Scanner -->
+    <string name="how_to_scan">How to scan</string>
+    <string name="position_qr_code">Position QR code in the frame</string>
+    <string name="toggle_flash">Toggle flash</string>
+    <string name="scanner_frame">QR code scanner frame</string>
+    <string name="qr_code_icon">QR code icon</string>
+    <string name="step_point_camera">Point your camera at the restaurant\'s QR code</string>
+    <string name="step_hold_steady">Hold steady until the code is recognized</string>
+    <string name="step_create_tab">Create your personal tab for bill collection</string>
+    <string name="simulate_qr_scan">Simulate QR Scan</string>
+    <string name="skip_scan_demo">Skip scan (Demo)</string>
+    <string name="qr_code_scanned">QR Code Scanned: %1$s</string>
+    <string name="invalid_qr_code">Invalid QR code. Please scan a valid Bill-O restaurant QR code.</string>
+    <string name="camera_permission_required">Camera permission is required to scan QR codes</string>
+    <string name="error_accessing_camera">Error accessing camera. Please try again.</string>
+    <string name="connecting_to_restaurant">Connecting to restaurant…</string>
+    <string name="connection_successful">Successfully connected to restaurant</string>
+    <string name="connection_failed">Failed to connect to restaurant. Please try again.</string>
+    
     <!-- Bottom Navigation -->
     <string name="title_orders">Orders</string>
     <string name="title_tab">My Tab</string>
@@ -79,6 +99,9 @@
     <string name="reported_issue">Reported Issue</string>
     <string name="no_issue_notes">No additional notes provided</string>
     
+    <!-- QR Scanner -->
+    <string name="scan_qr_code">Scan QR Code</string>
+    
     <!-- Errors -->
     <string name="error_loading_orders">Failed to load orders. Please try again.</string>
     <string name="error_loading_tab">Failed to load tab information. Please try again.</string>
@@ -92,6 +115,11 @@
     <string name="tab_orders">Orders</string>
     <string name="tab_tab">My Tab</string>
     <string name="tab_profile">Profile</string>
+    
+    <!-- Content Descriptions -->
+    <string name="desc_home">Home screen</string>
+    <string name="desc_saved_restaurants">View saved restaurants</string>
+    <string name="desc_easy_billing">Easy billing options</string>
     
     <!-- Plurals -->
     <plurals name="item_count">

@@ -1,5 +1,8 @@
 include ':app'
+include ':capacitor-android' // Add this line if it's missing
+project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor') // Adjust path if necessary
+
 include ':capacitor-cordova-android-plugins'
-project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
+project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/') // Or the correct path
 
 apply from: 'capacitor.settings.gradle'

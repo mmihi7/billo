@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Semi-transparent background -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#80000000" />
+        </shape>
+    </item>
+
+    <!-- Transparent center -->
+    <item
+        android:left="64dp"
+        android:right="64dp"
+        android:top="64dp"
+        android:bottom="64dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+            <stroke
+                android:width="2dp"
+                android:color="@color/white" />
+        </shape>
+    </item>
+
+    <!-- Top-left corner -->
+    <item
+        android:left="64dp"
+        android:top="64dp">
+        <rotate
+            android:fromDegrees="0"
+            android:pivotX="0%"
+            android:pivotY="0%">
+            <shape android:shape="line">
+                <stroke
+                    android:width="4dp"
+                    android:color="@color/white" />
+                <size android:width="48dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <item
+        android:left="64dp"
+        android:top="64dp">
+        <rotate
+            android:fromDegrees="90"
+            android:pivotX="0%"
+            android:pivotY="0%">
+            <shape android:shape="line">
+                <stroke
+                    android:width="4dp"
+                    android:color="@color/white" />
+                <size android:width="48dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <!-- Top-right corner -->
+    <item
+        android:right="64dp"
+        android:top="64dp">
+        <rotate
+            android:fromDegrees="90"
+            android:pivotX="100%"
+            android:pivotY="0%">
+            <shape android:shape="line">
+                <stroke
+                    android:width="4dp"
+                    android:color="@color/white" />
+                <size android:width="48dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <item
+        android:right="64dp"
+        android:top="64dp">
+        <rotate
+            android:fromDegrees="180"
+            android:pivotX="100%"
+            android:pivotY="0%">
+            <shape android:shape="line">
+                <stroke
+                    android:width="4dp"
+                    android:color="@color/white" />
+                <size android:width="48dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <!-- Bottom-left corner -->
+    <item
+        android:bottom="64dp"
+        android:left="64dp">
+        <rotate
+            android:fromDegrees="270"
+            android:pivotX="0%"
+            android:pivotY="100%">
+            <shape android:shape="line">
+                <stroke
+                    android:width="4dp"
+                    android:color="@color/white" />
+                <size android:width="48dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <item
+        android:bottom="64dp"
+        android:left="64dp">
+        <rotate
+            android:fromDegrees="0"
+            android:pivotX="0%"
+            android:pivotY="100%">
+            <shape android:shape="line">
+                <stroke
+                    android:width="4dp"
+                    android:color="@color/white" />
+                <size android:width="48dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <!-- Bottom-right corner -->
+    <item
+        android:bottom="64dp"
+        android:right="64dp">
+        <rotate
+            android:fromDegrees="180"
+            android:pivotX="100%"
+            android:pivotY="100%">
+            <shape android:shape="line">
+                <stroke
+                    android:width="4dp"
+                    android:color="@color/white" />
+                <size android:width="48dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <item
+        android:bottom="64dp"
+        android:right="64dp">
+        <rotate
+            android:fromDegrees="270"
+            android:pivotX="100%"
+            android:pivotY="100%">
+            <shape android:shape="line">
+                <stroke
+                    android:width="4dp"
+                    android:color="@color/white" />
+                <size android:width="48dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <!-- Animated scanning line -->
+    <item
+        android:left="64dp"
+        android:right="64dp"
+        android:top="64dp"
+        android:bottom="64dp">
+        <animated-vector
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            xmlns:aapt="http://schemas.android.com/aapt">
+            <aapt:attr name="android:drawable">
+                <vector
+                    android:width="24dp"
+                    android:height="24dp"
+                    android:viewportWidth="24"
+                    android:viewportHeight="24">
+                    <path
+                        android:name="scanner_line"
+                        android:pathData="M 0,0 L 24,0"
+                        android:strokeWidth="4"
+                        android:strokeColor="#4CAF50"
+                        android:strokeLineCap="round" />
+                </vector>
+            </aapt:attr>
+        </animated-vector>
+    </item>
+</layer-list>

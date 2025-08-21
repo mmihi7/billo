@@ -4,6 +4,13 @@ import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { getAuth, connectAuthEmulator, GoogleAuthProvider } from 'firebase/auth'
 import { Capacitor } from '@capacitor/core'
 
+// Debug: Log environment variables
+console.log('Environment variables:', {
+  VITE_FIREBASE_API_KEY: import.meta.env.VITE_FIREBASE_API_KEY ? '***' : 'MISSING',
+  VITE_FIREBASE_AUTH_DOMAIN: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? '***' : 'MISSING',
+  VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID ? '***' : 'MISSING'
+});
+
 // Firebase configuration object loaded from environment variables
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,

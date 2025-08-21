@@ -5,8 +5,8 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
-  // Load env file based on `mode` in the current working directory
-  const env = loadEnv(mode, process.cwd(), '')
+  // Load env file based on `mode` from the root directory
+  const env = loadEnv(mode, path.resolve(__dirname, '..'), '')
   
   // Base config for both web and mobile
   const baseConfig = {

@@ -3,3 +3,4 @@ node_modules
 google-services.json
 firebase.json
 archive
+.env

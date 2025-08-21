@@ -1,0 +1,109 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    // Apply default values if not set
+    if (!ext.has('androidGradlePluginVersion')) ext.androidGradlePluginVersion = '8.2.0'
+    if (!ext.has('kotlinVersion')) ext.kotlinVersion = '1.9.20'
+    if (!ext.has('hiltVersion')) ext.hiltVersion = '2.48.1'
+    if (!ext.has('googleServicesVersion')) ext.googleServicesVersion = '4.4.0'
+    
+    ext {
+        // Plugin versions
+        androidGradlePluginVersion = project.ext.androidGradlePluginVersion
+        kotlinVersion = project.ext.kotlinVersion
+        hiltVersion = project.ext.hiltVersion
+        googleServicesVersion = project.ext.googleServicesVersion
+        
+        // SDK versions - with validation
+        compileSdkVersion = project.hasProperty('compileSdkVersion') ? project.compileSdkVersion : 34
+        minSdkVersion = project.hasProperty('minSdkVersion') ? project.minSdkVersion : 24
+        targetSdkVersion = project.hasProperty('targetSdkVersion') ? project.targetSdkVersion : 34
+        jvmTarget = '17'  // Fixed for Java 17 compatibility
+        
+        // Dependency versions
+        coreKtxVersion = '1.12.0'
+        appcompatVersion = '1.6.1'
+        materialVersion = '1.11.0'
+        constraintLayoutVersion = '2.1.4'
+        lifecycleVersion = '2.6.2'
+        navigationVersion = '2.7.5'
+        coroutinesVersion = '1.7.3'
+        firebaseBomVersion = '32.3.1'
+        
+        // Testing
+        junitVersion = '4.13.2'
+        extJunitVersion = '1.1.5'
+        espressoVersion = '3.5.1'
+    }
+}
+
+plugins {
+    id 'com.android.application' version "$androidGradlePluginVersion" apply false
+    id 'org.jetbrains.kotlin.android' version "$kotlinVersion" apply false
+    id 'com.google.dagger.hilt.android' version "$hiltVersion" apply false
+    id 'com.google.gms.google-services' version "$googleServicesVersion" apply false
+}
+
+android {
+    namespace "com.billo.app"
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        viewBinding true
+        dataBinding true
+    }
+}
+
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:32.7.1')
+    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.recyclerview:recyclerview:1.2.1'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.viewpager2:viewpager2:1.0.0'
+    implementation 'androidx.navigation:navigation-fragment:2.5.3'
+    implementation 'androidx.navigation:navigation-ui:2.5.3'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel:2.6.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime:2.6.1'
+    implementation 'androidx.lifecycle:lifecycle-livedata:2.6.1'
+    implementation 'androidx.room:room-runtime:2.5.2'
+    implementation 'androidx.room:room-ktx:2.5.2'
+    implementation 'androidx.room:room-groovy:2.5.2'
+    implementation 'androidx.hilt:hilt-navigation:1.1.0'
+    implementation 'com.google.dagger:hilt-android:2.48.1'
+    implementation 'com.google.dagger:hilt-android-compiler:2.48.1'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'androidx.arch.core:core-testing:2.1.0'
+}
+
+repositories {
+    mavenCentral()
+}

@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/navigation_orders"
-        android:icon="@drawable/ic_orders"
-        android:title="@string/title_orders"
-        android:contentDescription="@string/desc_orders" />
+        android:id="@+id/navigation_home"
+        android:icon="@drawable/ic_home"
+        android:title="@string/title_home"
+        android:contentDescription="@string/desc_home" />
 
     <item
-        android:id="@+id/navigation_tab"
-        android:icon="@drawable/ic_tab"
-        android:title="@string/title_tab"
-        android:contentDescription="@string/desc_tab" />
+        android:id="@+id/navigation_saved_restaurants"
+        android:icon="@drawable/ic_saved"
+        android:title="@string/title_saved_restaurants"
+        android:contentDescription="@string/desc_saved_restaurants" />
 
     <item
-        android:id="@+id/navigation_profile"
-        android:icon="@drawable/ic_profile"
-        android:title="@string/title_profile"
-        android:contentDescription="@string/desc_profile" />
+        android:id="@+id/navigation_easy_billing"
+        android:icon="@drawable/ic_billing"
+        android:title="@string/title_easy_billing"
+        android:contentDescription="@string/desc_easy_billing" />
 </menu>
