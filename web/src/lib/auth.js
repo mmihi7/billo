@@ -82,10 +82,14 @@ export const signInAnonymous = async () => {
   }
 }
 
-// Sign in with email and password
-export const signInWithEmail = async (email, password, role = USER_ROLES.CUSTOMER) => {
+// Sign in with email and password (phone is used as password for now)
+export const signInWithEmail = async (email, phone, role = USER_ROLES.CUSTOMER) => {
   try {
-    const result = await signInWithEmailAndPassword(auth, email, password)
+    // In a production app, you would implement proper phone authentication
+    // For now, we'll use a simple approach where phone is used as password
+    const password = phone || 'defaultPassword';
+    
+    const result = await firebaseSignInWithEmailAndPassword(auth, email, password)
     const user = result.user
     
     // Get user profile to check role
@@ -96,6 +100,7 @@ export const signInWithEmail = async (email, password, role = USER_ROLES.CUSTOME
       user: {
         uid: user.uid,
         email: user.email,
+        phone: phone,
         displayName: user.displayName || userProfile?.displayName,
         photoURL: user.photoURL,
         role: userProfile?.role || role
@@ -110,12 +115,16 @@ export const signInWithEmail = async (email, password, role = USER_ROLES.CUSTOME
   }
 }
 
-// Create account with email and password
-export const createAccount = async (email, password, displayName, role = USER_ROLES.CUSTOMER) => {
+// Create account with email and phone (phone is used as password for now)
+export const createAccount = async (email, phone, displayName, role = USER_ROLES.CUSTOMER) => {
   try {
     console.log('Starting account creation for:', email);
     
     // 1. Create user in Firebase Auth
+    // In a production app, you would implement proper phone authentication
+    // For now, we'll use a simple approach where phone is used as password
+    const password = phone || 'defaultPassword';
+    
     const result = await firebaseCreateUserWithEmailAndPassword(auth, email, password);
     const user = result.user;
     console.log('User created with UID:', user.uid);
@@ -159,6 +168,7 @@ export const createAccount = async (email, password, displayName, role = USER_RO
       user: {
         uid: user.uid,
         email: user.email,
+        phone: phone,
         emailVerified: user.emailVerified,
         displayName: displayName,
         photoURL: user.photoURL,
@@ -201,6 +211,8 @@ export const createUserProfile = async (user, role, isAnonymous = false, customD
     const userData = {
       uid: user.uid,
       email: user.email,
+      // Store phone if available (passed from createAccount or signInWithEmail)
+      phone: user.phone || null,
       displayName: customDisplayName || user.displayName || (isAnonymous ? 'Anonymous User' : 'User'),
       photoURL: user.photoURL,
       role,
@@ -248,7 +260,7 @@ export const getUserProfile = async (uid) => {
 
 // Auth state observer
 export const onAuthStateChange = (callback) => {
-  return onAuthStateChanged(auth, async (user) => {
+  return firebaseOnAuthStateChanged(auth, async (user) => {
     if (user) {
       // Get user profile from Firestore
       const userProfile = await getUserProfile(user.uid)
@@ -256,6 +268,7 @@ export const onAuthStateChange = (callback) => {
       callback({
         uid: user.uid,
         email: user.email,
+        phone: user.phone || userProfile?.phone || null,
         displayName: user.displayName || userProfile?.displayName,
         photoURL: user.photoURL,
         role: userProfile?.role || USER_ROLES.CUSTOMER,

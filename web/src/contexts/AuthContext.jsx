@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged
-} from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
-import { getUserProfile, USER_ROLES } from '../lib/auth';
+import { auth } from '../lib/firebase';
+import { 
+  signInWithGoogle, 
+  signInWithEmail, 
+  createAccount, 
+  signOutUser, 
+  onAuthStateChange, 
+  getCurrentUser,
+  getUserProfile,
+  USER_ROLES 
+} from '../lib/auth';
 
 const AuthContext = createContext();
 
@@ -63,22 +65,23 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     console.log('Setting up auth state listener...');
     
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChange(async (user) => {
       console.log('Auth state changed. User:', user ? user.email : 'No user');
       
       if (user) {
         console.log('User found, updating profile...');
         try {
           await updateUserProfile(user);
-          console.log('User profile updated:', currentUser);
+          console.log('User profile updated');
         } catch (error) {
           console.error('Error updating user profile:', error);
+          setCurrentUser(null);
         }
       } else {
         console.log('No user, resetting state');
         setCurrentUser(null);
-        setLoading(false);
       }
+      setLoading(false);
     });
 
     return () => {
@@ -88,32 +91,76 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Auth functions
-  const signup = (email, password) => {
-    return createUserWithEmailAndPassword(auth, email, password);
+  const signup = async (email, password, displayName, role = USER_ROLES.CUSTOMER) => {
+    try {
+      const result = await createAccount(email, password, displayName, role);
+      if (result.success) {
+        await updateUserProfile(auth.currentUser);
+      }
+      return result;
+    } catch (error) {
+      console.error('Signup error:', error);
+      return { success: false, error: error.message };
+    }
   };
 
-  const login = (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
+  const login = async (email, phone) => {
+    try {
+      // For now, we'll use email/password for both email and phone login
+      // In a production app, you would implement phone authentication separately
+      const result = await signInWithEmail(email, phone);
+      if (result.success) {
+        await updateUserProfile(auth.currentUser);
+      }
+      return result;
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, error: error.message };
+    }
   };
 
-  const loginWithGoogle = () => {
-    return signInWithPopup(auth, googleProvider);
+  const loginWithGoogle = async (role = USER_ROLES.CUSTOMER) => {
+    try {
+      const result = await signInWithGoogle(role);
+      if (result.success) {
+        await updateUserProfile(auth.currentUser);
+      }
+      return result;
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      return { success: false, error: error.message };
+    }
   };
 
-  const logout = () => {
-    return signOut(auth);
+  const loginAnonymously = async () => {
+    try {
+      const userCredential = await signInAnonymous(auth);
+      return await updateUserProfile(userCredential.user);
+    } catch (error) {
+      console.error('Anonymous login error:', error);
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOutUser();
+      setCurrentUser(null);
+      return { success: true };
+    } catch (error) {
+      console.error('Logout error:', error);
+      return { success: false, error: error.message };
+    }
   };
 
   const value = {
     currentUser,
-    isAuthenticated: !!currentUser,
-    isAdmin: currentUser?.isAdmin || false,
-    loading,
-    signup,
     login,
+    signup,
     loginWithGoogle,
-    logout,
-    updateUserProfile
+    loginAnonymously,
+    logout: signOutUser,
+    loading
   };
 
   return (

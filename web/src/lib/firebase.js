@@ -43,7 +43,9 @@ googleProvider.setCustomParameters({
 });
 googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
 
-// Connect to Firebase emulators in development mode
+// Emulator configuration is disabled
+// To enable emulators, uncomment the following block and ensure the emulator is running
+/*
 if (import.meta.env.DEV) {
   try {
     // Use 10.0.2.2 for Android emulator to connect to localhost
@@ -58,5 +60,6 @@ if (import.meta.env.DEV) {
     console.warn('Failed to connect to Firebase emulators:', error);
   }
 }
+*/
 
 export default app

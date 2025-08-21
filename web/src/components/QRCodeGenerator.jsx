@@ -9,41 +9,154 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
+import { Copy, Download, X, Loader2, RefreshCw } from 'lucide-react'
 
 function QRCodeGenerator({ open, onOpenChange, restaurant }) {
   const [qrValue, setQrValue] = useState('')
+  const [alphanumericCode, setAlphanumericCode] = useState('')
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
+  const [isCodeCopied, setIsCodeCopied] = useState(false)
   const qrCodeRef = useRef(null)
+  const urlInputRef = useRef(null)
+  const codeInputRef = useRef(null)
+
+  // Generate a random alphanumeric code (e.g., 'A1B2C3')
+  const generateAlphanumericCode = () => {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  // Regenerate the code and update the URL
+  const regenerateCode = () => {
+    const newCode = generateAlphanumericCode();
+    setAlphanumericCode(newCode);
+    updateQrValue(newCode);
+  }
+
+  // Update QR value when code changes
+  const updateQrValue = (code) => {
+    const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
+    setQrValue(`${baseUrl}/customer/restaurant/${restaurant.id}?code=${code}`);
+  }
+
+  // Handle code input change
+  const handleCodeChange = (e) => {
+    const newCode = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6);
+    setAlphanumericCode(newCode);
+    updateQrValue(newCode);
+  }
+
+  // Copy text to clipboard
+  const copyToClipboard = async (text, setCopiedState) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (setCopiedState) {
+        setCopiedState(true);
+        setTimeout(() => setCopiedState(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  }
 
   useEffect(() => {
     if (open && restaurant) {
-      const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
-      const landingUrl = `${baseUrl}/landing?restaurantId=${restaurant.id}`;
-      setQrValue(landingUrl);
+      const code = generateAlphanumericCode();
+      setAlphanumericCode(code);
+      updateQrValue(code);
     }
   }, [open, restaurant])
 
-  const downloadQrCode = () => {
-    const svg = qrCodeRef.current.querySelector('svg')
-    if (!svg) return
+  const downloadQrCode = async () => {
+    const { jsPDF } = await import('jspdf');
+    const element = qrCodeRef.current;
+    
+    // Create a new PDF with A4 dimensions (portrait)
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
 
-    const svgData = new XMLSerializer().serializeToString(svg)
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    const img = new Image()
+    // Add title
+    pdf.setFontSize(24);
+    pdf.setTextColor(15, 23, 42); // gray-900
+    pdf.text(restaurant?.name || 'Restaurant Menu', 105, 30, { align: 'center' });
+    
+    // Add subtitle
+    pdf.setFontSize(14);
+    pdf.setTextColor(75, 85, 99); // gray-600
+    pdf.text('Scan or enter the code below to view our menu', 105, 40, { align: 'center' });
 
-    img.onload = () => {
-      canvas.width = img.width
-      canvas.height = img.height
-      ctx.drawImage(img, 0, 0)
-      const pngFile = canvas.toDataURL('image/png')
-      const downloadLink = document.createElement('a')
-      const safeName = restaurant.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
-      downloadLink.download = `billo-qr-${safeName}.png`
-      downloadLink.href = pngFile
-      downloadLink.click()
-    }
-    img.src = `data:image/svg+xml;base64,${btoa(svgData)}`
-  }
+    // Add QR code (centered, larger size)
+    const qrSvg = element.querySelector('svg');
+    const qrCanvas = document.createElement('canvas');
+    const qrCtx = qrCanvas.getContext('2d');
+    
+    // Set canvas size to match SVG
+    const qrSize = 120; // mm
+    const qrPxSize = 500; // pixels for high quality
+    qrCanvas.width = qrPxSize;
+    qrCanvas.height = qrPxSize;
+    
+    // Draw white background
+    qrCtx.fillStyle = 'white';
+    qrCtx.fillRect(0, 0, qrPxSize, qrPxSize);
+    
+    // Convert SVG to image data
+    const svgData = new XMLSerializer().serializeToString(qrSvg);
+    const img = new Image();
+    
+    await new Promise((resolve) => {
+      img.onload = () => {
+        // Draw QR code on canvas
+        qrCtx.drawImage(img, 0, 0, qrPxSize, qrPxSize);
+        
+        // Add QR code to PDF (centered, 80mm width)
+        const qrImgData = qrCanvas.toDataURL('image/png');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const qrWidth = 80; // mm
+        const xPos = (pageWidth - qrWidth) / 2;
+        
+        pdf.addImage(qrImgData, 'PNG', xPos, 50, qrWidth, qrWidth);
+        
+        // Add manual code section
+        pdf.setFontSize(18);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text('Or enter this code:', 105, 150, { align: 'center' });
+        
+        // Add code with background
+        pdf.setFillColor(243, 244, 246); // gray-100
+        pdf.roundedRect(70, 160, 70, 15, 4, 4, 'F');
+        
+        pdf.setFont('courier', 'bold');
+        pdf.setFontSize(20);
+        pdf.setTextColor(31, 41, 55); // gray-800
+        
+        // Center text in the box
+        const textWidth = pdf.getTextWidth(alphanumericCode);
+        const textX = 105 - (textWidth / 2);
+        pdf.text(alphanumericCode, textX, 171);
+        
+        // Add footer
+        pdf.setFontSize(10);
+        pdf.setTextColor(107, 114, 128); // gray-500
+        pdf.text('Generated by Billo - The Smart Restaurant Solution', 105, 280, { align: 'center' });
+        
+        // Save the PDF
+        const safeName = restaurant?.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'restaurant';
+        pdf.save(`billo-menu-${safeName}.pdf`);
+        resolve();
+      };
+      
+      img.src = `data:image/svg+xml;base64,${btoa(svgData)}`;
+    });
+  };
 
   const handleClose = () => {
     setQrValue('')
@@ -52,29 +165,144 @@ function QRCodeGenerator({ open, onOpenChange, restaurant }) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Your Restaurant QR Code</DialogTitle>
+          <DialogTitle>Restaurant Access Code</DialogTitle>
           <DialogDescription>
-            Customers can scan this code to open a tab. Print and display it
-            where customers can easily see it.
+            Share this code with your customers to let them access your menu and place orders.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-6 py-4">
           {qrValue ? (
-            <div className="p-4 bg-white rounded-md" ref={qrCodeRef}>
-              <QRCode value={qrValue} size={256} style={{ height: "auto", maxWidth: "100%", width: "100%" }} viewBox={`0 0 256 256`} />
-              <p className="text-center font-bold text-lg mt-2">{restaurant?.name}</p>
-              <p className="text-center text-muted-foreground">Scan to open a tab</p>
+            <div className="bg-white rounded-lg border p-6 shadow-sm" ref={qrCodeRef}>
+              {/* Logo and Name */}
+              <div className="flex flex-col items-center mb-6">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-3">
+                  <span className="text-2xl font-bold text-primary">
+                    {restaurant?.name?.charAt(0) || 'B'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-center">{restaurant?.name || 'Restaurant'}</h3>
+                <p className="text-muted-foreground text-sm">Scan the code below</p>
+              </div>
+              
+              {/* QR Code and Inputs */}
+              <div className="space-y-6">
+                <div className="flex justify-center">
+                  <div ref={qrCodeRef} className="p-4 bg-white rounded-lg">
+                    <QRCode
+                      value={qrValue}
+                      size={200}
+                      level="H"
+                      fgColor="#000000"
+                      bgColor="#ffffff"
+                    />
+                  </div>
+                </div>
+
+                {/* URL Input */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Restaurant URL</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        ref={urlInputRef}
+                        type="text"
+                        value={qrValue}
+                        readOnly
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => copyToClipboard(qrValue, setIsCopied)}
+                    >
+                      {isCopied ? 'Copied!' : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Code Input */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium leading-none">Access Code</label>
+                    <button
+                      type="button"
+                      onClick={regenerateCode}
+                      className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                      title="Generate new code"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Regenerate
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        ref={codeInputRef}
+                        type="text"
+                        value={alphanumericCode}
+                        onChange={handleCodeChange}
+                        maxLength={6}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono uppercase ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => copyToClipboard(alphanumericCode, setIsCodeCopied)}
+                    >
+                      {isCodeCopied ? 'Copied!' : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-center text-xs text-muted-foreground mt-4">
+                Display this code where customers can easily see it
+              </div>
             </div>
           ) : (
             <div className="h-64 flex items-center justify-center text-muted-foreground">
-              Generating QR Code...
+              Generating access code...
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button onClick={downloadQrCode} disabled={!qrValue}>Download QR Code</Button>
+        <DialogFooter className="sm:justify-between">
+          <Button variant="outline" onClick={handleClose}>
+            Close
+          </Button>
+          <Button 
+            onClick={async () => {
+              setIsDownloading(true);
+              try {
+                await downloadQrCode();
+              } catch (error) {
+                console.error('Error generating PDF:', error);
+              } finally {
+                setIsDownloading(false);
+              }
+            }} 
+            disabled={!qrValue || isDownloading} 
+            className="gap-2 min-w-[120px]"
+          >
+            {isDownloading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Download PDF
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

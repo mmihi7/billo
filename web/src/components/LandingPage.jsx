@@ -40,7 +40,7 @@ function LandingPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p>How would you like to open your tab?</p>
-          <Link to={`/customer?restaurantId=${restaurantId}`}>
+          <Link to={`/customer/signin?restaurantId=${restaurantId}`}>
             <Button className="w-full">
               <Globe className="w-4 h-4 mr-2" />
               Continue in Web Browser

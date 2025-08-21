@@ -13,6 +13,10 @@ import CustomerDashboard from './components/CustomerDashboard'
 import QRCodeScanner from './components/QRCodeScanner'
 import WaiterHome from './components/WaiterHome'
 import { Button } from './components/ui/button'
+import AuthPage from './components/auth/AuthPage'
+import CustomerAuthPage from './components/customer/CustomerAuthPage'
+import RestaurantConnection from './components/customer/RestaurantConnection'
+import RestaurantMenu from './components/customer/RestaurantMenu'
 import './App.css'
 
 // Protected route component for waiter dashboard
@@ -133,6 +137,26 @@ const WaiterRoute = ({ children }) => {
   )
 }
 
+// Protected route component for customer section
+const CustomerRoute = ({ children }) => {
+  const { currentUser, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <Navigate to="/customer/signin" state={{ from: location }} replace />;
+  }
+
+  return children || <Outlet />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -140,10 +164,20 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/landing" element={<LandingPage />} />
-          <Route path="/customer" element={<CustomerApp />}>
-            <Route index element={<QRCodeScanner />} />
-            <Route path="restaurant/:restaurantId/start" element={<CustomerNameInput />} />
-            <Route path="restaurant/:restaurantId/menu" element={<CustomerDashboard />} />
+          
+          {/* Authentication Routes */}
+          <Route path="/signin" element={<AuthPage mode="signin" />} />
+          <Route path="/signup" element={<AuthPage mode="signup" />} />
+          
+          {/* Customer Authentication Routes */}
+          <Route path="/customer/signin" element={<CustomerAuthPage mode="signin" />} />
+          <Route path="/customer/signup" element={<CustomerAuthPage mode="signup" />} />
+          
+          {/* Protected Customer Routes */}
+          <Route path="/customer" element={<CustomerRoute />}>
+            <Route path="restaurant/:restaurantId" element={<RestaurantConnection />} />
+            <Route path="restaurant/:restaurantId/menu" element={<RestaurantMenu />} />
+            <Route path="*" element={<CustomerApp />} />
           </Route>
           
           {/* Restaurant Dashboard */}
@@ -164,8 +198,6 @@ function App() {
           
           {/* Redirect old waiter route to new one */}
           <Route path="/restaurant/waiter" element={<Navigate to="/waiter" replace />} />
-          
-          {/* Legacy waiter dashboard routes have been removed */}
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

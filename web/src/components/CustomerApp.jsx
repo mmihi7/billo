@@ -1,21 +1,45 @@
-import { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
-import { createTab, getRestaurantById, subscribeToTabUpdates, subscribeToTabOrders } from '../lib/database'
-import { db } from '../lib/firebase'
-import { Button } from '@/components/ui/button.jsx'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
-import { Badge } from '@/components/ui/badge.jsx'
+import { useState, useEffect } from 'react';
+import { useSearchParams, Link, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
+import { createTab, getRestaurantById, subscribeToTabUpdates, subscribeToTabOrders } from '../lib/database';
+import { db } from '../lib/firebase';
+import { Button } from '@/components/ui/button.jsx';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
+import { Badge } from '@/components/ui/badge.jsx';
 import { Separator } from "@/components/ui/separator.jsx";
-import { ArrowLeft, CheckCircle, Clock, QrCode, Receipt } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Clock, QrCode, Receipt } from 'lucide-react';
+import CustomerHome from './customer/CustomerHome';
+import QRCodeScanner from './customer/QRCodeScanner';
+import CustomerDashboard from './CustomerDashboard';
+import CustomerNameInput from './CustomerNameInput';
+import { useAuth } from '../contexts/AuthContext';
 
-function CustomerApp() {
-  const [searchParams] = useSearchParams()
+// Layout component for customer section
+function CustomerLayout() {
+  const { currentUser } = useAuth();
+  const location = useLocation();
+  
+  // Redirect to customer login if not authenticated
+  if (!currentUser) {
+    return <Navigate to="/customer/signin" state={{ from: location }} replace />;
+  }
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Outlet />
+    </div>
+  );
+}
+
+// Component for handling the tab view
+function TabView() {
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState('loading'); // 'loading', 'scan', 'tab', 'error'
-  const [tab, setTab] = useState(null)
-  const [orders, setOrders] = useState([])
-  const [restaurant, setRestaurant] = useState(null)
-  const [error, setError] = useState('')
-  const [billAccepted, setBillAccepted] = useState(false)
+  const [tab, setTab] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [restaurant, setRestaurant] = useState(null);
+  const [error, setError] = useState('');
+  const [billAccepted, setBillAccepted] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     const restaurantId = searchParams.get('restaurantId');
@@ -144,7 +168,7 @@ function CustomerApp() {
       <div className="min-h-screen bg-background p-4">
         <div className="max-w-md mx-auto">
           <div className="flex items-center mb-6">
-            <Link to="/">
+            <Link to="/customer">
               <Button variant="ghost" size="sm" className="mr-2">
                 <ArrowLeft className="w-4 h-4" />
               </Button>
@@ -214,6 +238,23 @@ function CustomerApp() {
   }
 
   return null; // Fallback
+}
+
+function CustomerApp() {
+  return (
+    <Routes>
+      <Route path="/" element={<CustomerLayout />}>
+        <Route index element={<CustomerHome />} />
+        <Route path="tab" element={<TabView />} />
+        <Route path="scan" element={<QRCodeScanner />} />
+        <Route path="saved" element={<div>Saved Restaurants</div>} />
+        <Route path="billing" element={<div>Billing</div>} />
+        <Route path="help" element={<div>Help</div>} />
+        <Route path="restaurant/:restaurantId/start" element={<CustomerNameInput />} />
+        <Route path="restaurant/:restaurantId/menu" element={<CustomerDashboard />} />
+      </Route>
+    </Routes>
+  );
 }
 
 export default CustomerApp

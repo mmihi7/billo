@@ -467,7 +467,7 @@ const WaiterDashboard = ({ waiter }) => {
           
           {/* Inactive Tabs - All tabs that are not active (visible to all waiters) */}
           <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Inactive Tabs (Available to All)</h2>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Inactive Tabs</h2>
             <div className="flex flex-wrap gap-3">
               {inactiveTabs.length > 0 ? (
                 inactiveTabs.map(tab => (
@@ -492,7 +492,7 @@ const WaiterDashboard = ({ waiter }) => {
         
         {/* Orders Section - Only orders for tabs assigned to this waiter */}
         <div className="space-y-6">
-          <h2 className="text-lg font-medium text-gray-900">Orders for Your Tabs</h2>
+          <h2 className="text-lg font-medium text-gray-900">Tabs Orders</h2>
           {myOrders.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {/* Group orders by tabId */}

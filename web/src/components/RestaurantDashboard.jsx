@@ -16,7 +16,7 @@ import { sendEmailVerification } from 'firebase/auth'
 import WaiterManager from './WaiterManager'
 import MenuManager from './MenuManager'
 import QRCodeGenerator from './QRCodeGenerator'
-import { ArrowLeft, BarChart3, Users, DollarSign, Clock, CheckCircle, AlertCircle, LogOut, UserPlus, LogIn, QrCode, Utensils, ClipboardList, FileText, Plus, FileSpreadsheet, RefreshCw, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, BarChart3, Users, DollarSign, Clock, CheckCircle, AlertCircle, LogOut, UserPlus, LogIn, QrCode, Utensils, ClipboardList, FileText, Plus, FileSpreadsheet, RefreshCw, ShoppingBag, Settings, CreditCard, User, Image, Globe, Trash2 } from 'lucide-react'
 
 function RestaurantDashboard({ isAdminView = false }) {
   const navigate = useNavigate()
@@ -838,7 +838,7 @@ function RestaurantDashboard({ isAdminView = false }) {
               </TabsTrigger>
               <TabsTrigger value="menu"><Utensils className="w-4 h-4 mr-2" />Menu</TabsTrigger>
               <TabsTrigger value="waiters"><Users className="w-4 h-4 mr-2" />Waiters</TabsTrigger>
-              <TabsTrigger value="payments">Payment History</TabsTrigger>
+              <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-2" />Settings</TabsTrigger>
             </TabsList>
 
             {/* Active Tabs Tab */}
@@ -936,58 +936,86 @@ function RestaurantDashboard({ isAdminView = false }) {
               <WaiterManager restaurant={restaurant} />
             </TabsContent>
 
-            {/* Payments Tab */}
-            <TabsContent value="payments" className="space-y-4">
+            {/* Settings Tab */}
+            <TabsContent value="settings" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Payment History</CardTitle>
-                  <CardDescription>Recent payment transactions</CardDescription>
+                  <CardTitle>Restaurant Settings</CardTitle>
+                  <CardDescription>Manage your restaurant's configuration and preferences</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {payments.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">No payment history available</p>
+                <CardContent className="space-y-6">
+                  {/* General Settings */}
+                  <div className="space-y-4">
+                    <div className="flex items-center">
+                      <div className="bg-primary/10 p-2 rounded-lg mr-4">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium">Account Information</h3>
+                        <p className="text-sm text-muted-foreground">Update your restaurant details and contact information</p>
+                      </div>
+                      <Button variant="outline" size="sm" className="ml-auto">
+                        Edit
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {payments.map((payment) => (
-                        <div key={payment.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-medium">
-                                  Payment #{payment.referenceNumber || payment.id.slice(-6)}
-                                </p>
-                                {payment.customerName && (
-                                  <Badge variant="outline">{payment.customerName}</Badge>
-                                )}
-                                {payment.status === 'completed' && (
-                                  <Badge className="bg-green-100 text-green-800">
-                                    <CheckCircle className="w-4 h-4 mr-1" />
-                                    <span>Completed</span>
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {payment.tabId && `${payment.tabId} • `}
-                                {payment.time || (payment.timestamp?.toDate ? new Date(payment.timestamp.toDate()).toLocaleString() : '')}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-green-600">
-                                Ksh {typeof payment.amount === 'number' ? payment.amount.toFixed(2) : '0.00'}
-                              </p>
-                              {payment.method && (
-                                <Badge variant="outline" className="mt-1">
-                                  {payment.method}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
+
+                    <div className="flex items-center">
+                      <div className="bg-primary/10 p-2 rounded-lg mr-4">
+                        <Globe className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium">Currency & Region</h3>
+                        <p className="text-sm text-muted-foreground">Set your preferred currency and regional settings</p>
+                      </div>
+                      <Button variant="outline" size="sm" className="ml-auto">
+                        Configure
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center">
+                      <div className="bg-primary/10 p-2 rounded-lg mr-4">
+                        <Image className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium">Restaurant Logo</h3>
+                        <p className="text-sm text-muted-foreground">Upload or update your restaurant's logo</p>
+                      </div>
+                      <Button variant="outline" size="sm" className="ml-auto">
+                        Upload
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center">
+                      <div className="bg-primary/10 p-2 rounded-lg mr-4">
+                        <CreditCard className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium">M-Pesa Integration</h3>
+                        <p className="text-sm text-muted-foreground">Set up and manage M-Pesa payment processing</p>
+                      </div>
+                      <Button variant="outline" size="sm" className="ml-auto">
+                        Configure
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium text-foreground mb-4">Danger Zone</h3>
+                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-destructive">Delete Account</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Permanently delete your restaurant account and all associated data
+                          </p>
                         </div>
-                      ))}
+                        <Button variant="destructive" size="sm">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Account
+                        </Button>
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
