@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator.jsx";
 import { ArrowLeft, CheckCircle, Clock, QrCode, Receipt } from 'lucide-react';
 import CustomerHome from './customer/CustomerHome';
 import QRCodeScanner from './customer/QRCodeScanner';
-import CustomerDashboard from './CustomerDashboard';
+import CustomerDashboard from './customer/CustomerDashboard';
 import CustomerNameInput from './CustomerNameInput';
 import { useAuth } from '../contexts/AuthContext';
 

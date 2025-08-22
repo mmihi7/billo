@@ -1,60 +1,46 @@
-import React, { useState, useEffect } from 'react'
-import { useLocation, useOutlet } from 'react-router-dom'
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { AlertCircle } from 'lucide-react'
-import CustomerApp from './components/CustomerApp'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CustomerAuthProvider } from './contexts/CustomerAuthContext';
+import { Button } from './components/ui/button';
+
+// Layouts
+import CustomerLayout from './layouts/CustomerLayout';
+
+// Pages
+import LandingPage from './components/LandingPage';
+import HomePage from './components/HomePage';
+import AuthPage from './components/auth/AuthPage';
 import WaiterDashboardNew from './components/WaiterDashboard';
-import RestaurantDashboard from './components/RestaurantDashboard'
-import HomePage from './components/HomePage'
-import LandingPage from './components/LandingPage'
-import CustomerNameInput from './components/CustomerNameInput'
-import CustomerDashboard from './components/CustomerDashboard'
-import QRCodeScanner from './components/QRCodeScanner'
-import WaiterHome from './components/WaiterHome'
-import { Button } from './components/ui/button'
-import AuthPage from './components/auth/AuthPage'
-import CustomerAuthPage from './components/customer/CustomerAuthPage'
-import RestaurantConnection from './components/customer/RestaurantConnection'
-import RestaurantMenu from './components/customer/RestaurantMenu'
+import RestaurantDashboard from './components/RestaurantDashboard';
+
+// Customer Components
+import CustomerAuthPage from './components/customer/CustomerAuthPage';
+import RestaurantEntryPage from './pages/RestaurantEntryPage';
+import CustomerDashboard from './components/customer/CustomerDashboard';
+import SavedRestaurants from './components/customer/SavedRestaurants';
+import { ToastContainer } from './components/ui/ToastContainer';
+import ToastExample from './components/examples/ToastExample';
 import './App.css'
 
 // Protected route component for waiter dashboard
 const WaiterRoute = ({ children }) => {
-  const { user, loading } = useAuth()
-  const location = useLocation()
-  const [showError, setShowError] = useState('')
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
-  const [waiterData, setWaiterData] = useState(null)
-  
-  // Use the children prop or default to WaiterDashboard
-  const content = children || <WaiterDashboard />
+  const location = useLocation();
+  const [waiterData, setWaiterData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
 
-  useEffect(() => {
-    console.log('WaiterRoute - Auth state changed:', { user, loading })
-    
-    // Check if we have waiter data in location state (passed during navigation)
+  React.useEffect(() => {
+    // Check for waiter data in location state or fetch it
     if (location.state?.waiter) {
-      console.log('Waiter data found in location state:', location.state.waiter)
-      setWaiterData(location.state.waiter)
-      setShowError('')
-      setIsCheckingAuth(false)
-      return
+      setWaiterData(location.state.waiter);
+      setLoading(false);
+    } else {
+      // If no waiter data in location state, show the login/retry UI
+      setLoading(false);
     }
-    
-    // If no user in auth context and not loading, show error
-    if (!loading && !user) {
-      console.error('No authenticated user found')
-      setShowError('You need to be logged in to access this page')
-      setIsCheckingAuth(false)
-    } else if (user) {
-      console.log('User authenticated:', user.email)
-      setShowError('')
-      setIsCheckingAuth(false)
-    }
-  }, [user, loading, location.state])
+  }, [location]);
 
-  if (loading || isCheckingAuth) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
@@ -62,62 +48,16 @@ const WaiterRoute = ({ children }) => {
           <p className="mt-4 text-gray-600">Loading waiter dashboard...</p>
         </div>
       </div>
-    )
-  }
-
-  if (showError) {
-    // If we have a waiter in location state but still showing error, try to proceed
-    if (location.state?.waiter) {
-      console.log('Found waiter in location state, proceeding to dashboard...');
-      const childrenWithProps = React.Children.map(children, child => {
-        if (React.isValidElement(child)) {
-          return React.cloneElement(child, { waiter: location.state.waiter });
-        }
-        return child;
-      });
-      return <>{childrenWithProps}</>;
-    }
-    
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="max-w-md p-6 bg-white rounded-lg shadow-md text-center">
-          <div className="flex justify-center mb-4">
-            <AlertCircle className="w-12 h-12 text-red-500" />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-6">{showError}</p>
-          <div className="space-y-2">
-            <Button 
-              onClick={() => window.location.href = '/landing'}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Go to Login
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => window.location.reload()}
-              className="w-full"
-            >
-              Try Again
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
+    );
   }
 
   // If we have waiter data, render the protected content
-  if (waiterData || location.state?.waiter) {
-    const dataToPass = waiterData || location.state.waiter;
-    console.log('Rendering WaiterDashboard with data:', dataToPass);
-    
-    // Clone the children and pass the waiter data as a prop
+  if (waiterData) {
     const childrenWithProps = React.Children.map(children, child => {
       if (React.isValidElement(child)) {
         return React.cloneElement(child, { 
-          waiter: dataToPass,
-          // Pass additional context if needed
-          key: dataToPass.id || 'waiter-dashboard'
+          waiter: waiterData,
+          key: waiterData.id || 'waiter-dashboard'
         });
       }
       return child;
@@ -125,16 +65,31 @@ const WaiterRoute = ({ children }) => {
     
     return <>{childrenWithProps}</>;
   }
-  
-  // Show loading state while checking auth or loading data
+
+  // Show login/retry UI if no waiter data
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="text-center">
-        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading waiter dashboard...</p>
+      <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-6 text-center">Access Denied</h2>
+        <p className="text-gray-600 mb-6">Please log in to access the waiter dashboard.</p>
+        <div className="space-y-4">
+          <Button 
+            onClick={() => window.location.href = '/landing'}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Go to Login
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => window.location.reload()}
+            className="w-full"
+          >
+            Try Again
+          </Button>
+        </div>
       </div>
     </div>
-  )
+  );
 }
 
 // Protected route component for customer section
@@ -160,50 +115,53 @@ const CustomerRoute = ({ children }) => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <CustomerAuthProvider>
+        {/* Toast Container for showing notifications */}
+        <ToastContainer />
+        
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/landing" element={<LandingPage />} />
-          
-          {/* Authentication Routes */}
-          <Route path="/signin" element={<AuthPage mode="signin" />} />
-          <Route path="/signup" element={<AuthPage mode="signup" />} />
-          
-          {/* Customer Authentication Routes */}
-          <Route path="/customer/signin" element={<CustomerAuthPage mode="signin" />} />
-          <Route path="/customer/signup" element={<CustomerAuthPage mode="signup" />} />
-          
-          {/* Protected Customer Routes */}
-          <Route path="/customer" element={<CustomerRoute />}>
-            <Route path="restaurant/:restaurantId" element={<RestaurantConnection />} />
-            <Route path="restaurant/:restaurantId/menu" element={<RestaurantMenu />} />
-            <Route path="*" element={<CustomerApp />} />
-          </Route>
-          
-          {/* Restaurant Dashboard */}
-          <Route path="/restaurant" element={<RestaurantDashboard />} />
-          
-          {/* Waiter Home - Lists all waiters */}
-          <Route path="/waiterhome" element={<WaiterHome />} />
-          
-          {/* Individual Waiter Dashboard */}
-          <Route 
-            path="/waiter/:waiterId" 
-            element={
-              <WaiterRoute>
-                <WaiterDashboardNew />
-              </WaiterRoute>
-            } 
-          />
-          
-          {/* Redirect old waiter route to new one */}
-          <Route path="/restaurant/waiter" element={<Navigate to="/waiter" replace />} />
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
+              {/* Public Routes */}
+              <Route index element={<HomePage />} />
+              <Route path="/landing" element={<LandingPage />} />
+              <Route path="/auth" element={<AuthPage />} />
+
+              {/* Waiter Routes */}
+              <Route 
+                path="/waiter/:waiterId" 
+                element={
+                  <WaiterRoute>
+                    <WaiterDashboardNew />
+                  </WaiterRoute>
+                } 
+              />
+              
+              {/* Redirect old waiter route */}
+              <Route path="/restaurant/waiter" element={<Navigate to="/waiter" replace />} />
+
+              {/* Restaurant Dashboard */}
+              <Route path="/restaurant" element={<RestaurantDashboard />} />
+
+              {/* Customer Routes */}
+              <Route element={<CustomerLayout requireAuth={false} />}>
+                <Route path="/customer/auth" element={<CustomerAuthPage />} />
+              </Route>
+
+              <Route element={<CustomerLayout requireAuth={true} />}>
+                <Route path="/customer/connect" element={<RestaurantEntryPage />} />
+                <Route path="/customer/dashboard" element={<Navigate to="/customer/saved" replace />} />
+                <Route path="/customer/restaurant/:restaurantIdentifier" element={<CustomerDashboard />} />
+                <Route path="/customer/restaurant/:restaurantIdentifier/tab/:tabReference" element={<CustomerDashboard />} />
+                <Route path="/customer/saved" element={<SavedRestaurants />} />
+                <Route path="/customer-auth" element={<CustomerAuthPage />} />
+                <Route path="/examples/toast" element={<ToastExample />} />
+              </Route>
+
+              {/* Fallback route */}
+              <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </Router>
+      </CustomerAuthProvider>
     </AuthProvider>
-  )
+  );
 }
 
 export default App

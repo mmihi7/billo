@@ -49,6 +49,14 @@ const subscribeToTabs = (restaurantId, callback) => {
 
 // Tab Management Functions
 const createTab = async (tabData) => {
+  console.log('createTab called with data:', tabData);
+  
+  if (!tabData.restaurantId) {
+    const error = new Error('Missing required field: restaurantId');
+    console.error('Error in createTab:', error);
+    throw error;
+  }
+
   const restaurantRef = doc(db, RESTAURANTS_COLLECTION, tabData.restaurantId);
   const tabsCollectionRef = collection(db, TABS_COLLECTION);
 
@@ -58,15 +66,22 @@ const createTab = async (tabData) => {
   
   // Only validate waiter assignment if this is not a QR code scan
   if (!isQrCodeScan && (!tabData.waiterName || !tabData.waiterId)) {
-    throw new Error('Waiter assignment is required for manual tab creation.');
+    const error = new Error('Waiter assignment is required for manual tab creation.');
+    console.error('Error in createTab:', error);
+    throw error;
   }
 
+  console.log('Starting transaction for tab creation...');
   try {
     // Use a transaction to atomically update the counter and create the tab.
+    console.log('Inside transaction, getting restaurant document...');
     const newTabDocData = await runTransaction(db, async (transaction) => {
       const restaurantDoc = await transaction.get(restaurantRef);
+      console.log('Restaurant document exists:', restaurantDoc.exists());
       if (!restaurantDoc.exists()) {
-        throw new Error("Restaurant not found!");
+        const error = new Error(`Restaurant not found with ID: ${tabData.restaurantId}`);
+        console.error('Error in createTab:', error);
+        throw error;
       }
 
       const restaurantData = restaurantDoc.data();
@@ -88,7 +103,7 @@ const createTab = async (tabData) => {
       // and ensure orderCount is set to 0 for new tabs
       const tabStatus = isQrCodeScan ? 'inactive' : 'active';
       
-      transaction.set(newTabRef, {
+      const tabDocument = {
         ...tabData,
         status: tabStatus,
         total: 0,
@@ -99,7 +114,10 @@ const createTab = async (tabData) => {
         // Clear waiter info for QR code scans
         waiterName: isQrCodeScan ? '' : (tabData.waiterName || ''),
         waiterId: isQrCodeScan ? '' : (tabData.waiterId || '')
-      });
+      };
+      
+      console.log('Creating tab document:', tabDocument);
+      transaction.set(newTabRef, tabDocument);
 
       // Update the restaurant's counter and reset date within the transaction.
       transaction.update(restaurantRef, {
@@ -110,17 +128,30 @@ const createTab = async (tabData) => {
       return { id: newTabRef.id };
     });
 
+    console.log('Transaction completed, new tab ID:', newTabDocData.id);
+    
     // After the transaction, fetch the full document to get server-generated timestamps.
+    console.log('Fetching final tab document...');
     const finalTabRef = doc(db, TABS_COLLECTION, newTabDocData.id);
     const finalDocSnap = await getDoc(finalTabRef);
+    
     if (finalDocSnap.exists()) {
-      return { id: finalDocSnap.id, ...finalDocSnap.data() };
+      const tabData = { id: finalDocSnap.id, ...finalDocSnap.data() };
+      console.log('Successfully created tab:', tabData);
+      return tabData;
     }
+    
     // This should not happen if the transaction succeeded.
-    throw new Error('Could not retrieve newly created tab after transaction.');
+    const error = new Error('Could not retrieve newly created tab after transaction.');
+    console.error('Error in createTab:', error);
+    throw error;
   } catch (error) {
-    console.error('Error creating tab in transaction:', error)
-    throw error
+    console.error('Error in createTab transaction:', error);
+    if (error.code) {
+      console.error('Firestore error code:', error.code);
+      console.error('Firestore error details:', error.details);
+    }
+    throw error;
   }
 }
 
@@ -211,23 +242,68 @@ const updateTabStatus = async (tabId, status) => {
   }
 }
 
-const getActiveTabs = async (restaurantId) => {
+const getExistingTab = async (restaurantId, customerId) => {
   try {
     const q = query(
       collection(db, TABS_COLLECTION),
       where('restaurantId', '==', restaurantId),
-      where('status', 'in', ['active', 'pending_acceptance', 'bill_accepted']),
-      orderBy('createdAt', 'desc')
-    )
-    const querySnapshot = await getDocs(q)
+      where('customerId', '==', customerId),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      return { id: doc.id, ...doc.data() };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting existing tab:', {
+      error: error.message,
+      restaurantId,
+      customerId,
+      stack: error.stack
+    });
+    throw error;
+  }
+};
+
+const getActiveTabs = async (restaurantId, customerId = null) => {
+  try {
+    const conditions = [
+      where('restaurantId', '==', restaurantId),
+      where('status', 'in', ['active', 'pending_acceptance', 'bill_accepted'])
+    ];
+    
+    // If customerId is provided, only return their active tabs
+    if (customerId) {
+      conditions.push(where('customerId', '==', customerId));
+    }
+    
+    // Add ordering
+    conditions.push(orderBy('createdAt', 'desc'));
+    
+    const q = query(
+      collection(db, TABS_COLLECTION),
+      ...conditions
+    );
+    
+    const querySnapshot = await getDocs(q);
     
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    }))
+    }));
   } catch (error) {
-    console.error('Error getting active tabs:', error)
-    throw error
+    console.error('Error getting active tabs:', {
+      error: error.message,
+      restaurantId,
+      customerId,
+      stack: error.stack
+    });
+    throw error;
   }
 }
 
@@ -466,22 +542,32 @@ const subscribeToActiveTabs = (restaurantId, callback) => {
 // Restaurant Management
 const createRestaurant = async (restaurantData) => {
   try {
-    // Add timestamps and default values
-    const restaurantWithMeta = {
-      ...restaurantData,
+    const { ownerId, name, ...rest } = restaurantData;
+    
+    // First check if user already has a restaurant
+    const existingRestaurant = await getRestaurantByOwner(ownerId);
+    if (existingRestaurant) {
+      throw new Error('You already have a restaurant registered');
+    }
+    
+    const restaurantRef = doc(collection(db, RESTAURANTS_COLLECTION));
+    const nameSlug = name.toLowerCase().replace(/\s+/g, '-');
+    
+    const newRestaurant = {
+      ...rest,
+      name,
+      nameSlug, // Add URL-friendly name for searching
+      ownerId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      isActive: true,
+      status: 'active',
       dailyTabCounter: 0,
-      lastTabReset: serverTimestamp()
+      lastTabReset: null
     };
-
-    const docRef = await addDoc(
-      collection(db, RESTAURANTS_COLLECTION),
-      restaurantWithMeta
-    );
-
-    return { id: docRef.id, ...restaurantWithMeta };
+    
+    await setDoc(restaurantRef, newRestaurant);
+    
+    return { id: restaurantRef.id, ...newRestaurant };
   } catch (error) {
     console.error('Error creating restaurant:', error);
     throw new Error('Failed to create restaurant');
@@ -511,13 +597,122 @@ const getRestaurantById = async (restaurantId) => {
   try {
     const docRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
     const docSnap = await getDoc(docRef);
+    
     if (docSnap.exists()) {
       return { id: docSnap.id, ...docSnap.data() };
     } else {
+      console.log('No such restaurant!');
       return null;
     }
   } catch (error) {
-    console.error('Error getting restaurant by ID:', error);
+    console.error('Error getting restaurant:', error);
+    throw error;
+  }
+};
+
+const getRestaurantByName = async (name) => {
+  // Normalize the input name to lowercase and trim whitespace
+  const normalizedInput = name.trim().toLowerCase();
+  console.log(`Looking up restaurant by name: '${name}' (normalized: '${normalizedInput}')`);
+  
+  if (!normalizedInput) {
+    console.error('No valid name provided to getRestaurantByName');
+    return null;
+  }
+
+  try {
+    // First try exact match with the name as ID (for backward compatibility)
+    console.log('Trying direct document lookup with name as ID...');
+    const docRef = doc(db, RESTAURANTS_COLLECTION, normalizedInput);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      console.log('Found restaurant by direct ID lookup:', docSnap.id);
+      return { id: docSnap.id, ...docSnap.data() };
+    }
+    
+    console.log('No direct match, trying nameSlug query...');
+    
+    // If not found by ID, try querying by nameSlug field (case-insensitive)
+    const restaurantsRef = collection(db, RESTAURANTS_COLLECTION);
+    const querySnapshot = await getDocs(restaurantsRef);
+    
+    // Find a restaurant where nameSlug matches (case-insensitive)
+    const matchingRestaurants = [];
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.nameSlug && data.nameSlug.toLowerCase() === normalizedInput) {
+        matchingRestaurants.push({ id: doc.id, ...data });
+      }
+    });
+    
+    if (matchingRestaurants.length > 0) {
+      console.log(`Found ${matchingRestaurants.length} restaurants with matching nameSlug`);
+      // Return the first match (should be only one)
+      return matchingRestaurants[0];
+    }
+    
+    // If still not found, try a partial match on the name field
+    console.log('No exact nameSlug match, trying case-insensitive name search...');
+    
+    const allRestaurants = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    // Find restaurants where the name (case-insensitive) contains the search term
+    const partialMatches = allRestaurants.filter(restaurant => 
+      restaurant.name && restaurant.name.toLowerCase().includes(normalizedInput)
+    );
+    
+    if (partialMatches.length > 0) {
+      console.log(`Found ${partialMatches.length} restaurants with matching names`);
+      // Return the best match (exact match first, then partial matches)
+      const exactMatch = partialMatches.find(r => 
+        r.name.toLowerCase() === normalizedInput
+      );
+      
+      if (exactMatch) {
+        console.log('Found exact name match:', exactMatch.name);
+        return exactMatch;
+      }
+      
+      // If no exact match, return the first partial match
+      return partialMatches[0];
+    }
+    
+    console.log('No restaurant found with name or nameSlug matching:', normalizedInput);
+    return null;
+  } catch (error) {
+    console.error('Error in getRestaurantByName:', {
+      error: error.message,
+      name,
+      stack: error.stack
+    });
+    throw error;
+  }
+};
+
+const updateRestaurant = async (restaurantId, updates) => {
+  try {
+    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
+    
+    // If name is being updated, update nameSlug as well
+    if (updates.name) {
+      updates.nameSlug = updates.name.toLowerCase().replace(/\s+/g, '-');
+    }
+    
+    await updateDoc(restaurantRef, {
+      ...updates,
+      updatedAt: serverTimestamp()
+    });
+    
+    // Return the updated restaurant
+    const updatedDoc = await getDoc(restaurantRef);
+    return { id: updatedDoc.id, ...updatedDoc.data() };
+  } catch (error) {
+    console.error('Error updating restaurant:', error);
     throw error;
   }
 };
@@ -861,6 +1056,7 @@ export {
   // Tab Management
   createTab,
   getTabByReference,
+  getExistingTab,
   activateTab,
   updateTabStatus,
   getActiveTabs,
@@ -883,8 +1079,10 @@ export {
   
   // Restaurant Management
   createRestaurant,
+  updateRestaurant,
   getRestaurantByOwner,
   getRestaurantById,
+  getRestaurantByName,
   
   // Connection Test
   testFirestoreConnection,

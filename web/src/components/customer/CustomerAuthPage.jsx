@@ -1,97 +1,78 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
+import { useCustomerAuth } from '../../contexts/CustomerAuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { LogIn, Mail, Smartphone, AlertCircle } from 'lucide-react';
+import { LogIn, Mail, Smartphone, AlertCircle, ArrowLeft, Loader2, User, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useToast } from '../ui/use-toast';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Separator } from '../ui/separator';
 
 // Helper function to validate phone number
 const validatePhoneNumber = (phone) => {
-  // Remove all non-digit characters
   const digits = phone.replace(/\D/g, '');
-  
-  // Check if it's a valid phone number (between 10-15 digits)
   return /^\d{10,15}$/.test(digits);
 };
 
-const CustomerAuthPage = ({ mode = 'signin' }) => {
+const CustomerAuthPage = () => {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     email: '',
-    phone: '',
+    password: '',
     name: '',
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState('signin');
   const [searchParams] = useSearchParams();
-  const { login, signup, loginWithGoogle, loginAnonymously } = useAuth();
+  const location = useLocation();
+  const { 
+    signInWithEmail, 
+    signUpWithEmail, 
+    signInWithGoogle, 
+    currentUser 
+  } = useCustomerAuth();
   const navigate = useNavigate();
-  const isSignIn = mode === 'signin';
+  
+  const from = location.state?.from?.pathname || '/';
   const restaurantId = searchParams.get('restaurantId');
-  const redirectTo = searchParams.get('redirect') || (restaurantId ? `/customer/restaurant/${restaurantId}/menu` : '/customer');
-  const isGuestFlow = searchParams.get('guest') === 'true';
+  const redirectTo = searchParams.get('redirect') || 
+                    (restaurantId ? `/customer/restaurant/${restaurantId}` : from);
+  
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (currentUser) {
+      navigate(redirectTo, { replace: true });
+    }
+  }, [currentUser, navigate, redirectTo]);
 
-  // Handle form input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    
-    // Clear error for the field being edited
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-  
-  // Format phone number as user types
-  const handlePhoneChange = (e) => {
-    let value = e.target.value.replace(/\D/g, '');
-    
-    // Format as (123) 456-7890
-    if (value.length > 3 && value.length <= 6) {
-      value = `(${value.slice(0, 3)}) ${value.slice(3)}`;
-    } else if (value.length > 6) {
-      value = `(${value.slice(0, 3)}) ${value.slice(3, 6)}-${value.slice(6, 10)}`;
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      phone: value
-    }));
-    
-    if (errors.phone) {
-      setErrors(prev => ({
-        ...prev,
-        phone: ''
-      }));
-    }
   };
 
   const validateForm = () => {
     const newErrors = {};
     
-    // Email validation
+    if (activeTab === 'signup' && !formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = 'Email is invalid';
     }
     
-    // Phone validation
-    if (!formData.phone) {
-      newErrors.phone = 'Phone number is required';
-    } else if (!validatePhoneNumber(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number (10-15 digits)';
-    }
-    
-    // Name validation (only for signup)
-    if (!isSignIn && !formData.name.trim()) {
-      newErrors.name = 'Full name is required';
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
     
     setErrors(newErrors);
@@ -100,249 +81,273 @@ const CustomerAuthPage = ({ mode = 'signin' }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const validationErrors = validateForm();
     
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
-
+    if (!validateForm()) return;
+    
     setIsSubmitting(true);
     
     try {
-      if (isSignIn) {
-        await login(formData.email || formData.phone, formData.password);
+      if (activeTab === 'signin') {
+        await signInWithEmail(formData.email, formData.password);
+        toast.showToast({
+          title: 'Success',
+          description: 'Successfully signed in!',
+          variant: 'default',
+        });
       } else {
-        await signup(formData.email || formData.phone, formData.password, formData.name);
+        await signUpWithEmail(formData.email, formData.password, formData.name);
+        toast.showToast({
+          title: 'Success',
+          description: 'Account created successfully!',
+          variant: 'default',
+        });
       }
       
-      // Redirect to the specified URL or default
       navigate(redirectTo);
     } catch (error) {
       console.error('Authentication error:', error);
-      setErrors({ submit: error.message || 'Failed to authenticate. Please try again.' });
+      toast.showToast({
+        title: 'Error',
+        description: error.message || 'An error occurred during authentication',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle guest access
-  const handleGuestAccess = async () => {
-    try {
-      await loginAnonymously();
-      navigate(redirectTo);
-    } catch (error) {
-      console.error('Guest access error:', error);
-      setErrors({ submit: 'Failed to continue as guest. Please try again.' });
-    }
-  };
-
-  // Auto-handle guest flow on component mount
-  useEffect(() => {
-    if (isGuestFlow) {
-      handleGuestAccess();
-    }
-  }, []);
-
   const handleGoogleSignIn = async () => {
     try {
-      await loginWithGoogle();
+      setIsSubmitting(true);
+      await signInWithGoogle();
+      toast.showToast({
+        title: 'Success',
+        description: 'Successfully signed in with Google!',
+        variant: 'default',
+      });
       navigate(redirectTo);
     } catch (error) {
       console.error('Google sign in error:', error);
-      setErrors({ submit: error.message || 'Failed to sign in with Google' });
+      toast.showToast({
+        title: 'Error',
+        description: error.message || 'Failed to sign in with Google',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <motion.div 
-        className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {isSignIn ? 'Welcome Back!' : 'Join Billo'}
-          </h1>
-          <p className="text-gray-600">
-            {isSignIn ? 'Sign in to continue to your account' : 'Create your customer account'}
-          </p>
-        </div>
-
-        {errors.form && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-start">
-            <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-            <span>{errors.form}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isSignIn && (
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Full Name
-                </label>
-                {errors.name && (
-                  <span className="text-xs text-red-600">{errors.name}</span>
-                )}
-              </div>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="John Doe"
-                className={`w-full ${errors.name ? 'border-red-500' : ''}`}
-                aria-invalid={!!errors.name}
-                aria-describedby={errors.name ? 'name-error' : undefined}
-              />
-            </div>
-          )}
-          
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              {errors.email && (
-                <span className="text-xs text-red-600">{errors.email}</span>
-              )}
-            </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-4 w-4 text-gray-400" />
-              </div>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="your@email.com"
-                className={`w-full pl-10 ${errors.email ? 'border-red-500' : ''}`}
-                aria-invalid={!!errors.email}
-                aria-describedby={errors.email ? 'email-error' : undefined}
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                Phone Number
-              </label>
-              {errors.phone && (
-                <span className="text-xs text-red-600">{errors.phone}</span>
-              )}
-            </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Smartphone className={`h-4 w-4 ${errors.phone ? 'text-red-500' : 'text-gray-400'}`} />
-              </div>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={handlePhoneChange}
-                placeholder="(123) 456-7890"
-                className={`pl-10 w-full ${errors.phone ? 'border-red-500' : ''}`}
-                aria-invalid={!!errors.phone}
-                aria-describedby={errors.phone ? 'phone-error' : undefined}
-                maxLength={15}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processing...
-                </span>
-              ) : isSignIn ? 'Sign In' : 'Create Account'}
-            </Button>
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">
+            {activeTab === 'signin' ? 'Sign In' : 'Create Account'}
+          </CardTitle>
+          <CardDescription>
+            {activeTab === 'signin' 
+              ? 'Enter your credentials to access your account' 
+              : 'Create a new account to get started'}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="signin">Sign In</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
             
-            {isSignIn && (
+            <TabsContent value="signin" className="mt-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="text-sm font-medium">Email</label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={`mt-1 ${errors.email ? 'border-red-500' : ''}`}
+                    disabled={isSubmitting}
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password" className="text-sm font-medium">Password</label>
+                    <Link 
+                      to="/forgot-password" 
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={`mt-1 ${errors.password ? 'border-red-500' : ''}`}
+                    disabled={isSubmitting}
+                  />
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-500">{errors.password}</p>
+                  )}
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign In
+                    </>
+                  )}
+                </Button>
+              </form>
+              
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
+              
               <Button 
-                type="button"
-                variant="outline"
+                variant="outline" 
                 className="w-full"
-                onClick={handleGuestAccess}
+                onClick={handleGoogleSignIn}
                 disabled={isSubmitting}
               >
-                Continue as Guest
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" width="24" height="24">
+                  <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
+                    <path
+                      fill="#4285F4"
+                      d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.28426 53.749 C -8.52426 55.049 -9.21677 56.159 -10.0802 56.866 L -10.0736 56.866 L -6.016 60.366 C -4.784 61.566 -3.264 62.389 -1.514 62.689 C 0.235 62.989 1.986 62.789 3.616 62.089 C 6.976 60.579 9.236 57.399 9.236 53.469 C 9.236 52.959 9.19596 52.469 9.14596 51.989 C 8.98596 50.549 8.465 49.209 7.695 48.069 L -3.26396 51.509 L -3.264 51.509 Z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.816 60.366 L -10.0736 56.866 C -11.2336 57.866 -12.754 58.419 -14.754 58.419 C -17.444 58.419 -19.834 56.909 -20.814 54.539 L -24.991 54.539 L -29.015 58.029 C -27.105 61.839 -23.234 63.239 -14.754 63.239 Z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M -14.754 43.714 C -12.984 43.714 -11.404 44.244 -10.054 45.164 L -6.816 41.969 C -8.804 40.109 -11.514 39.189 -14.754 39.189 C -19.444 39.189 -23.444 41.899 -25.074 45.949 L -20.814 49.239 C -19.834 46.869 -17.444 45.359 -14.754 45.359 C -13.104 45.359 -11.574 45.889 -10.324 46.789 C -9.084 47.689 -8.184 49.009 -7.814 50.529 L -3.46396 47.199 C -4.364 44.629 -6.154 42.459 -8.434 41.069 C -10.714 39.679 -13.624 38.999 -14.754 38.999 Z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M -3.46396 47.199 L -7.814 50.529 C -7.184 52.199 -6.014 53.619 -4.464 54.609 C -2.924 55.599 -1.014 56.149 1.106 56.149 C 1.966 56.149 2.826 56.039 3.666 55.819 L 3.666 50.529 L 8.016 50.529 C 8.016 51.689 7.836 52.849 7.476 53.949 C 6.756 56.189 5.306 58.199 3.306 59.629 L -0.0839996 62.969 C 2.816 65.719 6.476 67.239 10.356 67.239 C 15.096 67.239 19.186 65.359 21.916 62.199 C 24.646 59.039 26.006 54.909 26.006 50.529 C 26.006 49.369 25.926 48.219 25.776 47.069 L -3.46396 47.199 Z"
+                    />
+                  </g>
+                </svg>
+                Continue with Google
               </Button>
-            )}
-          </div>
-        </form>
-
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">Or continue with</span>
-          </div>
-        </div>
-
-        <Button 
-          variant="outline" 
-          className="w-full flex items-center justify-center gap-2 py-2.5 mb-4"
-          onClick={handleGoogleSignIn}
-          disabled={isSubmitting}
-        >
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
-            <path
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              fill="#4285F4"
-            />
-            <path
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              fill="#34A853"
-            />
-            <path
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-              fill="#FBBC05"
-            />
-            <path
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              fill="#EA4335"
-            />
-          </svg>
-          {isSignIn ? 'Sign in with Google' : 'Sign up with Google'}
-        </Button>
-
-        <div className="mt-6 text-center text-sm">
-          {isSignIn ? (
-            <p className="text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/customer/signup" className="text-blue-600 hover:underline font-medium">
-                Sign up
-              </Link>
-            </p>
-          ) : (
-            <p className="text-gray-600">
-              Already have an account?{' '}
-              <Link to="/customer/signin" className="text-blue-600 hover:underline font-medium">
-                Sign in
-              </Link>
-            </p>
-          )}
-        </div>
-      </motion.div>
+            </TabsContent>
+            
+            <TabsContent value="signup" className="mt-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="name" className="text-sm font-medium">Full Name</label>
+                  <Input
+                    id="name"
+                    name="name"
+                    type="text"
+                    placeholder="John Doe"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className={`mt-1 ${errors.name ? 'border-red-500' : ''}`}
+                    disabled={isSubmitting}
+                  />
+                  {errors.name && (
+                    <p className="mt-1 text-sm text-red-500">{errors.name}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="signup-email" className="text-sm font-medium">Email</label>
+                  <Input
+                    id="signup-email"
+                    name="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={`mt-1 ${errors.email ? 'border-red-500' : ''}`}
+                    disabled={isSubmitting}
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="signup-password" className="text-sm font-medium">Password</label>
+                  <Input
+                    id="signup-password"
+                    name="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={`mt-1 ${errors.password ? 'border-red-500' : ''}`}
+                    disabled={isSubmitting}
+                  />
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-500">{errors.password}</p>
+                  )}
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : (
+                    'Create Account'
+                  )}
+                </Button>
+              </form>
+              
+              <div className="mt-6 text-center text-sm">
+                <p className="text-muted-foreground">
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => setActiveTab('signin')}
+                  >
+                    Sign in
+                  </button>
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 };

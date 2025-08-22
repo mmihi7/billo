@@ -1,0 +1,938 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useCustomerAuth } from '../../contexts/CustomerAuthContext';
+import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, setDoc, serverTimestamp, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { Button } from '../ui/button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
+import { Loader2, CheckCircle, CreditCard, Clock, AlertCircle, ArrowLeft, MapPin, Star, Plus, Check, History, Receipt, User, LogOut } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { useToast } from '../ui/use-toast';
+import { format } from 'date-fns';
+
+const CustomerDashboard = () => {
+  const { toast } = useToast();
+  const { restaurantIdentifier } = useParams();
+  const { currentUser, signOut, saveRestaurant, savedRestaurants } = useCustomerAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [bills, setBills] = useState([]);
+  const [activeOrders, setActiveOrders] = useState([]);
+  const [pastOrders, setPastOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [restaurant, setRestaurant] = useState(null);
+  const [activeTab, setActiveTab] = useState('active');
+  const [restaurantId, setRestaurantId] = useState(null);
+  
+  const isRestaurantSaved = savedRestaurants?.some(r => r.id === restaurantId);
+
+  // Fetch restaurant data by name or ID
+  const fetchRestaurantByIdentifier = async (identifier) => {
+    try {
+      // First try to get by ID (for backward compatibility)
+      const docRef = doc(db, 'restaurants', identifier);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() };
+      }
+      
+      // If not found by ID, try to find by nameSlug
+      const q = query(
+        collection(db, 'restaurants'),
+        where('nameSlug', '==', identifier)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0];
+        return { id: doc.id, ...doc.data() };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error fetching restaurant:', error);
+      throw error;
+    }
+  };
+
+  // Redirect to connect page if no restaurant is selected
+  useEffect(() => {
+    if (!restaurantIdentifier && currentUser) {
+      console.log('No restaurant selected, redirecting to saved restaurants');
+      navigate('/customer/saved');
+      return;
+    }
+  }, [restaurantIdentifier, currentUser, navigate]);
+
+  // Fetch restaurant data and orders
+  useEffect(() => {
+    console.log('useEffect running with:', { restaurantIdentifier, currentUser: !!currentUser });
+    if (!restaurantIdentifier || !currentUser) {
+      console.log('Missing required data, returning early');
+      return;
+    }
+    
+    const loadRestaurant = async () => {
+      try {
+        const restaurantData = await fetchRestaurantByIdentifier(restaurantIdentifier);
+        if (!restaurantData) {
+          throw new Error('Restaurant not found');
+        }
+        
+        setRestaurant(restaurantData);
+        setRestaurantId(restaurantData.id);
+        
+        // Update URL to use nameSlug if it's not already in the URL
+        if (restaurantData.nameSlug && restaurantData.nameSlug !== restaurantIdentifier) {
+          navigate(`/customer/restaurant/${restaurantData.nameSlug}`, { replace: true, state: location.state });
+          return;
+        }
+        
+        // Save restaurant to user's list if coming from connect flow
+        if (location.state?.fromConnect && !isRestaurantSaved) {
+          console.log('Saving restaurant to user list');
+          await handleSaveRestaurant(restaurantData);
+        }
+        
+        setLoading(false);
+        
+        // Subscribe to active orders
+        const activeOrdersQuery = query(
+          collection(db, `restaurants/${restaurantData.id}/orders`),
+          where('customerId', '==', currentUser.uid),
+          where('status', 'in', ['pending', 'preparing', 'ready']),
+          orderBy('createdAt', 'desc')
+        );
+
+        const activeUnsubscribe = onSnapshot(activeOrdersQuery, (snapshot) => {
+          const orders = [];
+          snapshot.forEach(doc => {
+            orders.push({ id: doc.id, ...doc.data() });
+          });
+          setActiveOrders(orders);
+        });
+
+        // Subscribe to past orders
+        const pastOrdersQuery = query(
+          collection(db, `restaurants/${restaurantData.id}/orders`),
+          where('customerId', '==', currentUser.uid),
+          where('status', 'in', ['completed', 'cancelled']),
+          orderBy('createdAt', 'desc')
+        );
+
+        const pastUnsubscribe = onSnapshot(pastOrdersQuery, (snapshot) => {
+          const orders = [];
+          snapshot.forEach(doc => {
+            orders.push({ id: doc.id, ...doc.data() });
+          });
+          setPastOrders(orders);
+        });
+
+        // Subscribe to bills
+        const billsQuery = query(
+          collection(db, `restaurants/${restaurantData.id}/bills`),
+          where('customerId', '==', currentUser.uid),
+          orderBy('createdAt', 'desc')
+        );
+
+        const billsUnsubscribe = onSnapshot(billsQuery, (snapshot) => {
+          const billsList = [];
+          snapshot.forEach(doc => {
+            billsList.push({ id: doc.id, ...doc.data() });
+          });
+          setBills(billsList);
+        });
+
+        return () => {
+          activeUnsubscribe();
+          pastUnsubscribe();
+          billsUnsubscribe();
+        };
+        
+      } catch (error) {
+        console.error('Error loading restaurant:', error);
+        setError('Failed to load restaurant. Please check the URL and try again.');
+        setLoading(false);
+      }
+    };
+    
+    loadRestaurant();
+    
+    // Cleanup function
+    return () => {
+      // Any cleanup if needed
+    };
+  }, [restaurantIdentifier, currentUser, navigate, location.state, isRestaurantSaved]);
+          console.log('Restaurant document found');
+          const restaurantData = { id: docSnap.id, ...docSnap.data() };
+          console.log('Setting restaurant data', restaurantData);
+          setRestaurant(restaurantData);
+          
+          // If coming from connection flow, save restaurant to user's saved list
+          if (location.state?.fromConnect && !isRestaurantSaved) {
+            console.log('Saving restaurant to user list');
+            await handleSaveRestaurant(restaurantData);
+          }
+          console.log('Setting loading to false');
+          setLoading(false);
+
+          // Subscribe to active orders
+          const activeOrdersQuery = query(
+            collection(db, `restaurants/${restaurantId}/orders`),
+            where('customerId', '==', currentUser.uid),
+            where('status', 'in', ['pending', 'preparing', 'ready']),
+            orderBy('createdAt', 'desc')
+          );
+
+          const activeUnsubscribe = onSnapshot(activeOrdersQuery, (snapshot) => {
+            const orders = [];
+            snapshot.forEach(doc => {
+              orders.push({ id: doc.id, ...doc.data() });
+            });
+            setActiveOrders(orders);
+          });
+
+          // Subscribe to past orders
+          const pastOrdersQuery = query(
+            collection(db, `restaurants/${restaurantId}/orders`),
+            where('customerId', '==', currentUser.uid),
+            where('status', 'in', ['completed', 'cancelled']),
+            orderBy('createdAt', 'desc')
+          );
+
+          const pastUnsubscribe = onSnapshot(pastOrdersQuery, (snapshot) => {
+            const orders = [];
+            snapshot.forEach(doc => {
+              orders.push({ id: doc.id, ...doc.data() });
+            });
+            setPastOrders(orders);
+          });
+
+          return () => {
+            activeUnsubscribe();
+            pastUnsubscribe();
+          };
+        } else {
+          setError('Restaurant not found');
+        }
+      } catch (err) {
+        setError('Failed to load restaurant data');
+        console.error('Error:', err);
+        setLoading(false);
+      }
+    };
+
+    fetchRestaurant();
+    
+    // Clear the fromConnect state after using it
+    if (location.state?.fromConnect) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [restaurantId, location.state, currentUser, isRestaurantSaved, navigate]);
+
+  // Subscribe to user's bills
+  useEffect(() => {
+    console.log('useEffect for bills running with:', { 
+      hasUser: !!currentUser?.uid, 
+      restaurantId,
+      loading 
+    });
+    
+    if (!currentUser?.uid || !restaurantId) {
+      console.log('Missing user or restaurant ID, not loading bills');
+      return;
+    }
+
+    console.log('Setting up bills subscription');
+    const q = query(
+      collection(db, 'bills'),
+      where('restaurantId', '==', restaurantId),
+      where('customerId', '==', currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      q, 
+      (querySnapshot) => {
+        console.log('Bills snapshot received, docs count:', querySnapshot.size);
+        const billsList = [];
+        querySnapshot.forEach((doc) => {
+          billsList.push({ id: doc.id, ...doc.data() });
+        });
+        console.log('Setting bills list with', billsList.length, 'bills');
+        setBills(billsList);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error in bills subscription:', error);
+        setError('Failed to load bills');
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      console.log('Cleaning up bills subscription');
+      unsubscribe();
+    };
+  }, [currentUser?.uid, restaurantId]);
+
+  const handleSaveRestaurant = async (restaurantData) => {
+    if (!currentUser || !restaurantData) return;
+    
+    setSaving(true);
+    try {
+      await saveRestaurant({
+        id: restaurantId || restaurantData.id,
+        name: restaurantData.name,
+        address: restaurantData.address,
+        image: restaurantData.logoUrl || '/restaurant-placeholder.jpg',
+        lastVisited: new Date().toISOString(),
+        savedAt: new Date().toISOString(),
+        nameSlug: restaurantData.nameSlug || restaurantData.name.toLowerCase().replace(/\s+/g, '-')
+      });
+      
+      toast({
+        title: 'Restaurant saved!',
+        description: `${restaurantData.name} has been added to your saved restaurants.`,
+        variant: 'default',
+      });
+    } catch (error) {
+      console.error('Error saving restaurant:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save restaurant. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAcceptBill = async (billId) => {
+    try {
+      const billRef = doc(db, 'bills', billId);
+      await updateDoc(billRef, { 
+        status: 'accepted',
+        acceptedAt: serverTimestamp() 
+      });
+      
+      toast({
+        title: 'Bill accepted',
+        description: 'Your bill has been accepted.',
+      });
+    } catch (err) {
+      console.error('Error accepting bill:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to accept bill. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handlePayBill = async (bill) => {
+    // In a real app, this would integrate with a payment processor
+    try {
+      const billRef = doc(db, 'bills', bill.id);
+      await updateDoc(billRef, { 
+        status: 'paid',
+        paidAt: serverTimestamp() 
+      });
+      
+      toast({
+        title: 'Payment successful',
+        description: 'Thank you for your payment!',
+      });
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      toast({
+        title: 'Payment failed',
+        description: 'There was an error processing your payment. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Format order timestamp
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate();
+    return format(date, 'MMM d, yyyy h:mm a');
+  };
+
+  // Get status badge color
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'preparing':
+        return 'bg-blue-100 text-blue-800';
+      case 'ready':
+        return 'bg-green-100 text-green-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto text-blue-500" />
+          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-md">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 mx-auto text-red-500" />
+            <h2 className="mt-4 text-xl font-semibold text-gray-900">Error Loading Dashboard</h2>
+            <p className="mt-2 text-gray-600">{error}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-6"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main dashboard layout
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm py-4 px-6">
+        <div className="flex justify-between items-center max-w-7xl mx-auto">
+          <div className="flex items-center space-x-4">
+            {restaurant ? (
+              <>
+                <h1 className="text-xl font-semibold text-gray-900">{restaurant.name}</h1>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Connected
+                </span>
+              </>
+            ) : (
+              <h1 className="text-xl font-semibold text-gray-900">Customer Dashboard</h1>
+            )}
+          </div>
+          <div className="flex items-center space-x-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate('/customer/saved')}
+              className="flex items-center"
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              My Restaurants
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={signOut}
+              className="flex items-center"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-hidden">
+        {restaurant ? (
+          <div className="flex h-full">
+            {/* Orders Panel (70% width) */}
+            <div className="w-7/12 p-6 overflow-y-auto border-r border-gray-200">
+              <Tabs defaultValue="active" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <TabsList>
+                    <TabsTrigger value="active">Active Orders</TabsTrigger>
+                    <TabsTrigger value="history">Order History</TabsTrigger>
+                  </TabsList>
+                  <Button 
+                    onClick={() => navigate(`/restaurant/${restaurantId}/menu`)}
+                    className="ml-4"
+                  >
+                    View Menu
+                  </Button>
+                </div>
+
+                <TabsContent value="active">
+                  {activeOrders.length > 0 ? (
+                    <div className="space-y-4">
+                      {activeOrders.map((order) => (
+                        <div key={order.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                              <p className="text-sm text-gray-500">
+                                {formatDate(order.createdAt?.toDate())}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(order.status)}`}>
+                              {order.status}
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-sm">
+                              <span className="font-medium">Total:</span> ${order.total?.toFixed(2) || '0.00'}
+                            </p>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2 w-full"
+                            onClick={() => navigate(`/customer/order/${order.id}`)}
+                          >
+                            View Details
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Receipt className="h-12 w-12 mx-auto text-gray-400" />
+                      <h3 className="mt-2 text-lg font-medium text-gray-900">No active orders</h3>
+                      <p className="mt-1 text-gray-500">Your orders will appear here</p>
+                      <Button 
+                        variant="outline" 
+                        className="mt-4"
+                        onClick={() => navigate(`/restaurant/${restaurantId}/menu`)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Place an Order
+                      </Button>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="history">
+                  {pastOrders.length > 0 ? (
+                    <div className="space-y-4">
+                      {pastOrders.map((order) => (
+                        <div key={order.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                              <p className="text-sm text-gray-500">
+                                {formatDate(order.completedAt?.toDate() || order.createdAt?.toDate())}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(order.status)}`}>
+                              {order.status}
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-sm">
+                              <span className="font-medium">Total:</span> ${order.total?.toFixed(2) || '0.00'}
+                            </p>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2 w-full"
+                            onClick={() => navigate(`/customer/order/${order.id}`)}
+                          >
+                            View Details
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <History className="h-12 w-12 mx-auto text-gray-400" />
+                      <h3 className="mt-2 text-lg font-medium text-gray-900">No order history</h3>
+                      <p className="mt-1 text-gray-500">Your past orders will appear here</p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            {/* Right Panel (30% width) */}
+            <div className="w-5/12 bg-white border-l p-6 overflow-y-auto">
+              <div className="space-y-6">
+                {/* Restaurant Info Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Restaurant Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-blue-100 rounded-full">
+                          <MapPin className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Location</p>
+                          <p className="text-sm">{restaurant.address || 'No address provided'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-green-100 rounded-full">
+                          <Clock className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Status</p>
+                          <p className="text-sm">{restaurant.isOpen ? 'Open Now' : 'Closed'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => navigate(`/restaurant/${restaurantId}/menu`)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Place New Order
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                {/* Chat Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Chat with Staff</CardTitle>
+                    <CardDescription>Get help with your order in real-time</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-48 flex items-center justify-center bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">Chat feature coming soon</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+            
+            {/* Chat Panel (30% width) */}
+            <div className="w-5/12 p-6 overflow-y-auto bg-white">
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle>Chat with Staff</CardTitle>
+                  <CardDescription>
+                    Need help? Chat with our staff in real-time.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-48 flex items-center justify-center bg-gray-50 rounded-lg">
+                    <p className="text-gray-500">Chat feature coming soon</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center max-w-md p-6">
+              <MapPin className="h-12 w-12 mx-auto text-gray-400" />
+              <h2 className="mt-4 text-xl font-semibold text-gray-900">No Restaurant Selected</h2>
+              <p className="mt-2 text-gray-600">
+                Please select a restaurant from your saved list or connect to a new one.
+              </p>
+              <div className="mt-6 space-x-3">
+                <Button onClick={() => navigate('/customer/saved')}>
+                  <MapPin className="h-4 w-4 mr-2" />
+                  My Restaurants
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate('/customer/connect')}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Connect to Restaurant
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-6">
+              <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <Button 
+                  onClick={() => navigate('/')} 
+                  variant="outline"
+                  className="flex items-center"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Home
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-6">
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">Restaurant not found</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <Button 
+                  onClick={() => navigate('/customer/connect')} 
+                  variant="outline"
+                  className="flex items-center"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Connect to a Different Restaurant
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {restaurant?.name || 'Dashboard'}
+              </h1>
+              {restaurant?.address && (
+                <p className="flex items-center text-sm text-gray-500 mt-1">
+                  <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
+                  <span className="truncate">{restaurant.address}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {restaurant && (
+                <Button
+                  variant={isRestaurantSaved ? 'outline' : 'default'}
+                  onClick={() => !isRestaurantSaved && handleSaveRestaurant(restaurant)}
+                  disabled={saving || isRestaurantSaved}
+                  className="flex-1 md:flex-none"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : isRestaurantSaved ? (
+                    <Check className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Star className="h-4 w-4 mr-2" />
+                  )}
+                  {isRestaurantSaved ? 'Saved' : 'Save Restaurant'}
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                onClick={() => signOut()}
+                className="flex-1 md:flex-none"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2 max-w-md mb-8">
+            <TabsTrigger value="active" className="flex items-center">
+              <Clock className="h-4 w-4 mr-2" />
+              Active Orders
+              {activeOrders.length > 0 && (
+                <span className="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                  {activeOrders.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center">
+              <History className="h-4 w-4 mr-2" />
+              Order History
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="active">
+            <div className="space-y-6">
+              <h2 className="text-lg font-medium text-gray-900">Active Orders</h2>
+              
+              {activeOrders.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <Clock className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No active orders</h3>
+                    <p className="text-gray-500">Your active orders will appear here</p>
+                    <Button 
+                      onClick={() => navigate(`/restaurant/${restaurantId}/menu`)}
+                      className="mt-4"
+                    >
+                      Browse Menu
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {activeOrders.map((order) => (
+                    <Card key={order.id} className="overflow-hidden">
+                      <CardHeader className="bg-gray-50 px-4 py-3 border-b">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Order #{order.orderNumber}</p>
+                            <p className="text-xs text-gray-500">{formatDate(order.createdAt)}</p>
+                          </div>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(order.status)}`}>
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          </span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {order.items?.map((item, index) => (
+                            <div key={index} className="flex justify-between">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{item.name}</p>
+                                {item.notes && (
+                                  <p className="text-xs text-gray-500 mt-1">Note: {item.notes}</p>
+                                )}
+                              </div>
+                              <div className="text-sm font-medium">
+                                {item.quantity} × ${item.price?.toFixed(2) || '0.00'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <div className="flex justify-between text-sm font-medium">
+                            <span>Total</span>
+                            <span>${order.total?.toFixed(2) || '0.00'}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-medium text-gray-900">Order History</h2>
+                <p className="text-sm text-gray-500">{pastOrders.length} orders</p>
+              </div>
+              
+              {pastOrders.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <Receipt className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No past orders</h3>
+                    <p className="text-gray-500 mb-4">Your order history will appear here</p>
+                    <Button 
+                      onClick={() => navigate(`/restaurant/${restaurantId}/menu`)}
+                      variant="outline"
+                    >
+                      Browse Menu
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                  <ul className="divide-y divide-gray-200">
+                    {pastOrders.map((order) => (
+                      <li key={order.id} className="hover:bg-gray-50 transition-colors">
+                        <button 
+                          onClick={() => navigate(`/restaurant/${restaurantId}/order/${order.id}`)}
+                          className="block w-full text-left"
+                        >
+                          <div className="px-4 py-4 sm:px-6">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-blue-600 truncate">
+                                Order #{order.orderNumber}
+                              </p>
+                              <div className="ml-2 flex-shrink-0 flex">
+                                <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(order.status)}`}>
+                                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-2 sm:flex sm:justify-between">
+                              <div className="sm:flex">
+                                <p className="flex items-center text-sm text-gray-500">
+                                  {order.items?.length} {order.items?.length === 1 ? 'item' : 'items'} • ${order.total?.toFixed(2) || '0.00'}
+                                </p>
+                              </div>
+                              <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                                <Clock className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
+                                <p>{formatDate(order.createdAt)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
+    </div>
+  );
+};
+
+export default CustomerDashboard;

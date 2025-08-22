@@ -1,6 +1,8 @@
 // Authentication service with Google Sign-In
 import { 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut, 
   signInWithEmailAndPassword as firebaseSignInWithEmailAndPassword,
@@ -28,21 +30,32 @@ export const USER_ROLES = {
 // Sign in with Google
 export const signInWithGoogle = async (role = USER_ROLES.CUSTOMER) => {
   try {
-    const result = await signInWithPopup(auth, googleProvider)
-    const user = result.user
+    // First check if we have a redirect result
+    const result = await getRedirectResult(auth);
     
-    // Create or update user profile in Firestore
-    await createUserProfile(user, role)
-    
-    return {
-      success: true,
-      user: {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-        role
-      }
+    if (result) {
+      // We have a redirect result
+      const user = result.user;
+      // Create or update user profile in Firestore
+      await createUserProfile(user, role);
+      
+      return {
+        success: true,
+        user: {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          role
+        }
+      };
+    } else {
+      // No redirect result, initiate the sign-in
+      await signInWithRedirect(auth, googleProvider);
+      return {
+        success: true,
+        pending: true // Indicate that we're waiting for redirect
+      };
     }
   } catch (error) {
     console.error('Google sign-in error:', error)
@@ -294,4 +307,7 @@ export const isAuthenticated = (user) => {
 export const getCurrentUser = () => {
   return auth.currentUser
 }
+
+// Export getRedirectResult for auth context
+export { getRedirectResult };
 

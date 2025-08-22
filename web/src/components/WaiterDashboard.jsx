@@ -66,17 +66,29 @@ const WaiterDashboard = ({ waiter }) => {
   
   // --- State ---
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedItems, setSelectedItems] = useState([{ menuItemId: '', quantity: 1, notes: '', category: '' }]);
+  const [selectedItems, setSelectedItems] = useState([{ 
+    menuItemId: '', 
+    quantity: 1, 
+    notes: '', 
+    category: '' 
+  }]);
   const [orderNotes, setOrderNotes] = useState('');
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [allTabs, setAllTabs] = useState([]); // All tabs for the restaurant
-  const [myActiveTabs, setMyActiveTabs] = useState([]); // Tabs assigned to this waiter
-  const [myOrders, setMyOrders] = useState([]); // Orders for myActiveTabs
+  const [allTabs, setAllTabs] = useState([]);
+  const [myActiveTabs, setMyActiveTabs] = useState([]);
+  const [myOrders, setMyOrders] = useState([]);
   const [selectedTabId, setSelectedTabId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showOrderForm, setShowOrderForm] = useState(false);
+  
+  // Derived state using useMemo for better performance
+  const { inactiveTabs, activeTabs, selectedTab } = useMemo(() => ({
+    inactiveTabs: allTabs.filter(tab => (tab.orderCount || 0) === 0),
+    activeTabs: myActiveTabs.filter(tab => (tab.orderCount || 0) > 0),
+    selectedTab: allTabs.find(tab => tab.id === selectedTabId) || null
+  }), [allTabs, myActiveTabs, selectedTabId]);
   
   // --- Refs for Cleanup ---
   const allTabsUnsubRef = useRef(null);
@@ -133,19 +145,19 @@ const WaiterDashboard = ({ waiter }) => {
     };
   }, [restaurantId]);
 
-  // --- EFFECT: Listen for ALL Tabs (for Inactive Tabs) ---
+  // --- EFFECT: Listen for Inactive Tabs (visible to all waiters) ---
   useEffect(() => {
     if (!restaurantId) return;
 
-    console.log("[All Tabs Effect] Setting up listener for all tabs in restaurant:", restaurantId);
-    const tabsQuery = query(
+    console.log("[Inactive Tabs Effect] Setting up listener for inactive tabs in restaurant:", restaurantId);
+    const inactiveTabsQuery = query(
       collection(db, 'tabs'),
-      where('restaurantId', '==', restaurantId)
-      // No status filter here to get all tabs
+      where('restaurantId', '==', restaurantId),
+      where('orderCount', '==', 0) // Tabs with no orders are inactive
     );
 
-    const unsubscribe = onSnapshot(tabsQuery, (tabsSnapshot) => {
-      console.log("[All Tabs Listener] Snapshot received. Size:", tabsSnapshot.size);
+    const unsubscribe = onSnapshot(inactiveTabsQuery, (tabsSnapshot) => {
+      console.log("[Inactive Tabs Listener] Snapshot received. Size:", tabsSnapshot.size);
       const tabs = [];
       tabsSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -154,14 +166,17 @@ const WaiterDashboard = ({ waiter }) => {
           ...data,
           referenceNumber: data.referenceNumber || data.tableNumber || `TAB-${doc.id.substring(0, 4).toUpperCase()}`,
           total: typeof data.total === 'number' ? data.total : 0,
+          status: 'inactive',
+          customerName: data.customerName || '',
           waiterName: data.waiterName || 'Unassigned',
         });
       });
+      // Only update inactive tabs
       setAllTabs(tabs);
-      console.log("[All Tabs Effect] All tabs updated:", tabs.length);
+      console.log("[Inactive Tabs Effect] Inactive tabs updated:", tabs.length);
     }, (error) => {
-       console.error("[All Tabs Listener] Error:", error);
-       setError(`Error loading tabs: ${error.message}`);
+      console.error("[Inactive Tabs Listener] Error:", error);
+      setError(`Error loading inactive tabs: ${error.message}`);
     });
 
     allTabsUnsubRef.current = unsubscribe;
@@ -172,16 +187,16 @@ const WaiterDashboard = ({ waiter }) => {
     };
   }, [restaurantId]);
 
-  // --- EFFECT: Listen for MY Active Tabs ---
+  // --- EFFECT: Listen for Active Tabs (only those I've served) ---
   useEffect(() => {
     if (!waiterData.id || !restaurantId) return;
 
-    console.log("[My Active Tabs Effect] Setting up listener for active tabs assigned to waiter:", waiterData.id);
+    console.log("[My Active Tabs Effect] Setting up listener for active tabs served by waiter:", waiterData.id);
     const myActiveTabsQuery = query(
       collection(db, 'tabs'),
       where('restaurantId', '==', restaurantId),
-      where('status', '==', 'active'), // Only active tabs
-      where('waiterId', '==', waiterData.id) // Only assigned to me
+      where('orderCount', '>', 0), // Has at least one order
+      where('waiterId', '==', waiterData.id) // Only tabs I've served
     );
 
     const unsubscribe = onSnapshot(myActiveTabsQuery, (tabsSnapshot) => {
@@ -194,6 +209,8 @@ const WaiterDashboard = ({ waiter }) => {
           ...data,
           referenceNumber: data.referenceNumber || data.tableNumber || `TAB-${doc.id.substring(0, 4).toUpperCase()}`,
           total: typeof data.total === 'number' ? data.total : 0,
+          status: 'active',
+          customerName: data.customerName || '',
           waiterName: data.waiterName || 'Unassigned',
         });
       });
@@ -293,83 +310,91 @@ const WaiterDashboard = ({ waiter }) => {
     }
   }, []);
 
-  const handleOrderSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    if (!selectedTabId || !selectedItems.some(item => item.menuItemId)) {
-      toast.error('Please select a tab and at least one valid menu item');
+  const handleSubmitOrder = useCallback(async () => {
+    if (!selectedTabId || selectedItems.length === 0) {
+      toast.error('Please select a tab and add items to the order');
       return;
     }
+
     try {
       setIsSubmitting(true);
       
-      // Determine if the selected tab is currently inactive
-      const selectedTab = allTabs.find(tab => tab.id === selectedTabId);
-      if (!selectedTab) {
-        throw new Error('Selected tab not found');
-      }
-      
-      // Prepare order items
-      const itemsWithDetails = selectedItems
-        .filter(item => item.menuItemId)
-        .map(item => {
-          const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
-          return {
-            menuItemId: item.menuItemId,
-            name: menuItem?.name || 'Unknown Item',
-            price: parseFloat(menuItem?.price) || 0,
-            quantity: parseInt(item.quantity) || 1,
-            notes: item.notes || ''
-          };
-        });
-
-      if (itemsWithDetails.length === 0) {
-          toast.error('No valid items to order.');
-          return;
+      // Filter out any empty items
+      const validItems = selectedItems.filter(item => item.menuItemId);
+      if (validItems.length === 0) {
+        toast.error('Please add at least one item to the order');
+        return;
       }
 
-      const orderTotal = itemsWithDetails.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      // Get tab reference and current data
+      const tabRef = doc(db, 'tabs', selectedTabId);
+      const tabSnap = await getDoc(tabRef);
       
-      // --- Firestore Batch Write ---
+      if (!tabSnap.exists()) {
+        throw new Error('Tab not found');
+      }
+      
+      const tabData = tabSnap.data();
+      const currentOrderCount = tabData.orderCount || 0;
+      const isNewOrder = currentOrderCount === 0;
+      
+      // Create order document
+      const orderRef = doc(collection(db, 'orders'));
+      const orderItems = validItems.map(item => {
+        const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
+        return {
+          menuItemId: item.menuItemId,
+          name: menuItem?.name || 'Unknown Item',
+          price: menuItem?.price || 0,
+          quantity: item.quantity,
+          notes: item.notes || '',
+          status: 'pending',
+          category: menuItem?.category || 'Uncategorized'
+        };
+      });
+
+      // Calculate order total
+      const orderTotal = orderItems.reduce((total, item) => {
+        return total + (item.price * item.quantity);
+      }, 0);
+
+      // Start batch write
       const batch = writeBatch(db);
       
-      // 1. Create new order document
-      const newOrderRef = doc(collection(db, 'orders'));
-      const newOrder = {
-        id: newOrderRef.id,
+      // 1. Add the order
+      batch.set(orderRef, {
         tabId: selectedTabId,
-        tabReferenceNumber: selectedTab.referenceNumber,
-        items: itemsWithDetails,
+        items: orderItems,
         status: 'pending',
         total: orderTotal,
-        createdAt: new Date(),
-        updatedAt: new Date(),
         waiterId: waiterData.id,
         waiterName: waiterData.name,
         restaurantId: restaurantId,
         notes: orderNotes,
-      };
-      batch.set(newOrderRef, newOrder);
-      
-      // 2. Update the tab document to make it active and assign to waiter
-      const tabRef = doc(db, 'tabs', selectedTabId);
-      const tabUpdate = {
-        status: 'active', // Activate the tab
-        waiterId: waiterData.id, // Assign waiter
-        waiterName: waiterData.name,
+        createdAt: new Date(),
         updatedAt: new Date()
-        // total will be updated below
+      });
+      
+      // 2. Update the tab
+      const tabUpdate = {
+        orderCount: currentOrderCount + 1,
+        total: (tabData.total || 0) + orderTotal,
+        status: 'active',
+        updatedAt: new Date()
       };
+      
+      // Only update waiter info if this is the first order
+      if (isNewOrder) {
+        tabUpdate.waiterId = waiterData.id;
+        tabUpdate.waiterName = waiterData.name;
+      }
+      
       batch.update(tabRef, tabUpdate);
       
-      // 3. Commit the batch
-      console.log('[Order Submit] Committing batch write for new order...');
+      // Commit the batch
       await batch.commit();
-      console.log('[Order Submit] Batch write successful.');
       
-      // 4. Update tab total *after* successful commit
-      await updateTabTotal(selectedTabId);
-      
-      // 5. Reset form state
+      // Reset form
       setSelectedItems([{ menuItemId: '', quantity: 1, notes: '', category: '' }]);
       setOrderNotes('');
       setSelectedTabId('');
@@ -382,11 +407,45 @@ const WaiterDashboard = ({ waiter }) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedTabId, selectedItems, allTabs, menuItems, waiterData, restaurantId, orderNotes, updateTabTotal]);
+  }, [selectedTabId, selectedItems, menuItems, waiterData, restaurantId, orderNotes]);
+
+  // --- New Tab Creation ---
+  const handleCreateTab = useCallback(async (customerName = '') => {
+    if (!restaurantId) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      // Generate a reference number (e.g., TAB-1234)
+      const refNumber = `TAB-${Math.floor(1000 + Math.random() * 9000)}`;
+      
+      const newTabRef = doc(collection(db, 'tabs'));
+      await setDoc(newTabRef, {
+        restaurantId,
+        referenceNumber: refNumber,
+        status: 'inactive',
+        customerName: customerName.trim(),
+        orderCount: 0,
+        total: 0,
+        waiterId: null, // No waiter assigned until first order
+        waiterName: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      
+      toast.success(`Created new tab ${refNumber}`);
+      return newTabRef.id; // Return the new tab ID
+    } catch (error) {
+      console.error('Error creating tab:', error);
+      toast.error(`Failed to create tab: ${error.message}`);
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [restaurantId]);
 
   // --- Derived State for Rendering ---
-  // Inactive tabs are those from allTabs that are NOT active
-  const inactiveTabs = allTabs.filter(tab => tab.status !== 'active');
+  // Using the memoized values that were already defined above
 
   // --- Render Logic ---
   if (isLoading) { // Show loading only while initial data is loading
@@ -437,123 +496,78 @@ const WaiterDashboard = ({ waiter }) => {
         </div>
       </header>
       
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Tabs Section */}
-        <div className="space-y-6 mb-8">
-          {/* Active Tabs - Only tabs assigned to this waiter */}
-          <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Your Active Tabs</h2>
-            <div className="flex flex-wrap gap-3">
-              {myActiveTabs.length > 0 ? (
-                myActiveTabs.map(tab => (
-                  <TabCard 
-                    key={tab.id} 
-                    tab={tab} 
-                    onClick={() => {
-                      setSelectedTabId(tab.id);
-                      setShowOrderForm(true);
-                    }}
-                    isActive={true}
-                  />
-                ))
-              ) : (
-                <div className="w-full text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                  No active tabs assigned to you
-                </div>
-              )}
-            </div>
+      {/* Active Tabs Section */}
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-medium text-gray-900">My Active Tabs</h2>
+            <Button 
+              onClick={() => setShowOrderForm(true)}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Processing...' : 'New Order'}
+            </Button>
           </div>
           
-          {/* Inactive Tabs - All tabs that are not active (visible to all waiters) */}
-          <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Inactive Tabs</h2>
-            <div className="flex flex-wrap gap-3">
-              {inactiveTabs.length > 0 ? (
-                inactiveTabs.map(tab => (
-                  <TabCard 
-                    key={tab.id} 
-                    tab={tab} 
-                    onClick={() => {
-                      setSelectedTabId(tab.id);
-                      setShowOrderForm(true);
-                    }}
-                    isActive={false}
-                  />
-                ))
-              ) : (
-                <div className="w-full text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                  No inactive tabs available
-                </div>
-              )}
+          {activeTabs.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-lg shadow">
+              <Utensils className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No active tabs</h3>
+              <p className="mt-1 text-sm text-gray-500">Create a new order to get started.</p>
             </div>
-          </div>
-        </div>
-        
-        {/* Orders Section - Only orders for tabs assigned to this waiter */}
-        <div className="space-y-6">
-          <h2 className="text-lg font-medium text-gray-900">Tabs Orders</h2>
-          {myOrders.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {/* Group orders by tabId */}
-              {Object.entries(
-                myOrders.reduce((acc, order) => {
-                  const tabId = order.tabId || 'Unknown';
-                  if (!acc[tabId]) {
-                    acc[tabId] = [];
-                  }
-                  acc[tabId].push(order);
-                  return acc;
-                }, {})
-              ).map(([tabId, tabOrders]) => {
-                 const tab = myActiveTabs.find(t => t.id === tabId); // Find tab details from myActiveTabs
-                 const tabReference = tab ? (tab.referenceNumber || tab.id?.substring(0, 4)) : 'Unknown Tab';
-                 return (
-                  <Card key={`tab-orders-${tabId}`} className="overflow-hidden flex flex-col h-full">
-                    <CardContent className="p-4 flex-1 flex flex-col">
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeTabs.map((tab) => {
+                const tabOrders = myOrders.filter(order => order.tabId === tab.id);
+                const tabReference = tab.referenceNumber || tab.id?.substring(0, 4);
+                
+                return (
+                  <Card key={tab.id} className="flex flex-col h-full">
+                    <CardContent className="flex flex-col h-full p-4">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="font-medium">Tab {tabReference}</h3>
                         <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
                           {tabOrders.length} {tabOrders.length === 1 ? 'order' : 'orders'}
                         </span>
                       </div>
-                      <div className="space-y-2 mb-3 flex-1 overflow-y-auto">
-                        {tabOrders.flatMap(order => 
-                          (order.items || []).map((item, index) => (
-                            <div key={`${order.id}-${index}`} className="flex justify-between text-sm">
-                              <div className="flex items-center">
-                                <span className="font-medium">{item.quantity}x</span>
-                                <span className="ml-2">{item.name}</span>
-                                {item.notes && (
-                                  <span className="ml-2 text-xs text-gray-500">({item.notes})</span>
-                                )}
-                              </div>
-                              <span>${(item.price * item.quantity).toFixed(2)}</span>
+                      {tabOrders.length > 0 ? (
+                        <>
+                          <div className="space-y-2 mb-3 flex-1 overflow-y-auto">
+                            {tabOrders.flatMap(order => 
+                              (order.items || []).map((item, index) => (
+                                <div key={`${order.id}-${index}`} className="flex justify-between text-sm">
+                                  <div className="flex items-center">
+                                    <span className="font-medium">{item.quantity}x</span>
+                                    <span className="ml-2">{item.name}</span>
+                                    {item.notes && (
+                                      <span className="ml-2 text-xs text-gray-500">({item.notes})</span>
+                                    )}
+                                  </div>
+                                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                          <div className="mt-auto pt-2 border-t border-gray-100">
+                            <div className="flex justify-between font-medium">
+                              <span>Tab Total</span>
+                              <span>${(tabOrders.reduce((sum, order) => sum + (order.total || 0), 0)).toFixed(2)}</span>
                             </div>
-                          ))
-                        )}
-                      </div>
-                      <div className="mt-auto pt-2 border-t border-gray-100">
-                        <div className="flex justify-between font-medium">
-                          <span>Tab Total</span>
-                          <span>${(tabOrders.reduce((sum, order) => sum + (order.total || 0), 0)).toFixed(2)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center text-center p-4">
+                          <div>
+                            <Utensils className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                            <p className="text-sm text-gray-500">No orders for this tab yet</p>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
-                 );
+                );
               })}
             </div>
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <Utensils className="w-6 h-6 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No orders for your tabs</h3>
-                <p className="text-gray-500">Orders will appear here once you place them</p>
-              </CardContent>
-            </Card>
           )}
         </div>
         
@@ -776,7 +790,7 @@ const WaiterDashboard = ({ waiter }) => {
             </div>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 };

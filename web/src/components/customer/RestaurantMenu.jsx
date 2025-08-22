@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getRestaurantById, getMenuItems } from '../../lib/database';
+import { getRestaurantById, subscribeToMenu } from '../../lib/database';
 import { useAuth } from '../../contexts/AuthContext';
 
 const RestaurantMenu = () => {
@@ -26,9 +26,14 @@ const RestaurantMenu = () => {
         }
         setRestaurant(restaurantData);
         
-        // Fetch menu items
-        const items = await getMenuItems(restaurantId);
-        setMenuItems(items);
+        // Subscribe to menu items
+        const unsubscribe = subscribeToMenu(restaurantId, (items) => {
+          setMenuItems(items);
+          setLoading(false);
+        });
+        
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
         
       } catch (err) {
         console.error('Error loading restaurant data:', err);

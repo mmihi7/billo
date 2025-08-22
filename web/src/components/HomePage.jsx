@@ -37,7 +37,7 @@ export default function HomePage() {
               <CardDescription>Open a tab and manage your bill</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link to="/customer" className="w-full">
+              <Link to="/customer/auth" className="w-full">
                 <Button className="w-full">
                   Start Tab
                 </Button>
@@ -52,7 +52,7 @@ export default function HomePage() {
               <CardDescription>Monitor tabs and payments</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link to="/restaurant" className="w-full">
+              <Link to="/auth?role=admin" className="w-full">
                 <Button variant="outline" className="w-full">
                   Admin Dashboard
                 </Button>

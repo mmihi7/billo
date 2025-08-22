@@ -144,8 +144,10 @@ kapt {
 
 dependencies {
     // Core Library Desugaring
-    // Ensure 'desugarJdkLibs' is defined in rootProject.ext.versions, e.g., versions.desugarJdkLibs = '2.0.4'
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:$rootProject.ext.versions.desugarJdkLibs"
+    
+    // Google Sign-In
+    implementation 'com.google.android.gms:play-services-auth:20.7.0'
 
     // Local .jar files (if any in the 'libs' directory)
     // implementation fileTree(include: ['*.jar'], dir: 'libs')

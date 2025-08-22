@@ -1,15 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../lib/firebase';
+import { useNavigate } from 'react-router-dom';
+import { auth, db } from '../lib/firebase';
 import { 
-  signInWithGoogle, 
+  signInWithGoogle as firebaseSignInWithGoogle,
   signInWithEmail, 
   createAccount, 
   signOutUser, 
   onAuthStateChange, 
   getCurrentUser,
   getUserProfile,
-  USER_ROLES 
+  USER_ROLES,
+  getRedirectResult
 } from '../lib/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -18,6 +21,7 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }) {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +64,32 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   };
+
+  // Handle redirect result
+  useEffect(() => {
+    const handleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          // User just signed in with redirect
+          const user = result.user;
+          const token = await user.getIdToken();
+          const userProfile = await updateUserProfile(user);
+          
+          // Use the updated currentUser state for role check
+          if (currentUser?.role === 'admin') {
+            navigate('/restaurant');
+          } else {
+            navigate('/customer/dashboard');
+          }
+        }
+      } catch (error) {
+        console.error('Error handling redirect:', error);
+      }
+    };
+
+    handleRedirect();
+  }, [navigate, currentUser]); // Only include stable dependencies
 
   // Set up auth state listener
   useEffect(() => {
@@ -104,31 +134,52 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (email, phone) => {
+  const login = async (email, password, role = USER_ROLES.CUSTOMER) => {
     try {
-      // For now, we'll use email/password for both email and phone login
-      // In a production app, you would implement phone authentication separately
-      const result = await signInWithEmail(email, phone);
+      const result = await signInWithEmail(email, password, role);
       if (result.success) {
-        await updateUserProfile(auth.currentUser);
+        const user = await updateUserProfile(auth.currentUser);
+        return user;
       }
-      return result;
+      throw new Error(result.error?.message || 'Login failed');
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: error.message };
+      throw error;
     }
   };
 
-  const loginWithGoogle = async (role = USER_ROLES.CUSTOMER) => {
+  // Check if user has accepted terms
+  const checkTermsAccepted = async (userId) => {
+    if (!userId) return false;
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    return userDoc.exists() ? userDoc.data().acceptedTerms : false;
+  };
+
+  // Update terms acceptance
+  const updateTermsAcceptance = async (userId, accepted = true) => {
+    if (!userId) return;
+    await setDoc(doc(db, 'users', userId), 
+      { acceptedTerms: accepted },
+      { merge: true }
+    );
+  };
+
+  // Sign in with Google
+  const loginWithGoogle = async () => {
     try {
-      const result = await signInWithGoogle(role);
-      if (result.success) {
-        await updateUserProfile(auth.currentUser);
+      setLoading(true);
+      // This will trigger the redirect flow
+      const result = await firebaseSignInWithGoogle();
+      if (result.pending) {
+        // The redirect will be handled by the redirect handler
+        return null;
       }
-      return result;
+      return result?.user || null;
     } catch (error) {
       console.error('Google sign-in error:', error);
-      return { success: false, error: error.message };
+      throw new Error('Google sign-in failed');
+    } finally {
+      setLoading(false);
     }
   };
 

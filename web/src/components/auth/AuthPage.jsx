@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { LogIn, Mail, Github } from 'lucide-react';
+import { LogIn, Mail } from 'lucide-react';
+import { FcGoogle } from 'react-icons/fc';
 import { motion } from 'framer-motion';
 
 const AuthPage = ({ mode = 'signin' }) => {
@@ -22,23 +23,48 @@ const AuthPage = ({ mode = 'signin' }) => {
 
     try {
       if (isSignIn) {
-        await login(email, password);
+        const user = await login(email, password);
+        // Redirect based on user role
+        if (user.role === 'admin') {
+          navigate('/restaurant');
+        } else {
+          navigate('/customer/dashboard');
+        }
       } else {
-        await signup(email, password);
+        const result = await signup(email, password);
+        if (result.success) {
+          // After successful signup, redirect to login or dashboard based on role
+          if (result.user?.role === 'admin') {
+            navigate('/restaurant');
+          } else {
+            navigate('/customer/dashboard');
+          }
+        } else {
+          throw new Error(result.error || 'Signup failed');
+        }
       }
-      navigate('/customer');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Authentication failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleGoogleSignIn = async () => {
     try {
-      await loginWithGoogle();
-      navigate('/customer');
+      setError('');
+      setLoading(true);
+      const user = await loginWithGoogle();
+      // Redirect based on user role
+      if (user.role === 'admin') {
+        navigate('/restaurant');
+      } else {
+        navigate('/customer/dashboard');
+      }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Google sign-in failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -121,8 +147,8 @@ const AuthPage = ({ mode = 'signin' }) => {
           onClick={handleGoogleSignIn}
           disabled={loading}
         >
-          <Github className="w-5 h-5 text-gray-800" />
-          {isSignIn ? 'Sign in with GitHub' : 'Sign up with GitHub'}
+          <FcGoogle className="w-5 h-5" />
+          {isSignIn ? 'Sign in with Google' : 'Sign up with Google'}
         </Button>
 
         <div className="mt-6 text-center text-sm">

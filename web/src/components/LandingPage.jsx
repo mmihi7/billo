@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { getRestaurantById } from '../lib/database';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
-import { Smartphone, Globe } from 'lucide-react';
+import { Smartphone, Globe, Bell } from 'lucide-react';
 
 function LandingPage() {
   const [searchParams] = useSearchParams();
@@ -52,9 +52,23 @@ function LandingPage() {
               Open in Android App
             </Button>
           </a>
-          <p className="text-xs text-muted-foreground pt-2">
-            If you don't have the app, you will be redirected to the Play Store.
+          <p className="text-sm text-muted-foreground">
+            Don't have the app?{' '}
+            <a href="https://play.google.com/store/apps/details?id=com.billo.app" className="text-primary hover:underline">
+              Download it here
+            </a>
           </p>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-8 pt-4 border-t">
+              <p className="text-xs text-muted-foreground mb-2">Development Tools</p>
+              <Link to="/examples/toast">
+                <Button variant="outline" size="sm" className="w-full">
+                  <Bell className="w-4 h-4 mr-2" />
+                  Toast Example
+                </Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
